@@ -51,3 +51,14 @@ Niveles provisionales mientras no hay normas: ≥90 Fortaleza, 70–89 Esperado,
 
 Los resultados son datos personales sensibles (LFPDPPP). El aviso en `/privacidad` es una plantilla que debe revisar un
 abogado. Cambiar `NOTICE_VERSION` en `lib/privacy.ts` cuando cambie el aviso.
+
+## Supabase email templates
+
+So that confirmation links work in any browser or device, set these in
+Supabase › Authentication › Emails › Templates:
+
+- **Confirm signup**: `<a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">Confirmar mi correo</a>`
+- **Reset password**: `<a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery">Cambiar mi contraseña</a>`
+
+The built-in Supabase mailer only sends a few emails per hour; configure custom SMTP
+(Authentication › Emails › SMTP Settings) before inviting real users.

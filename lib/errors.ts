@@ -12,6 +12,14 @@ const MESSAGES: Record<string, string> = {
   "Invalid login credentials": "Correo o contraseña incorrectos.",
   "User already registered": "Ya existe una cuenta con ese correo.",
   "Email not confirmed": "Confirma tu correo con el enlace que te enviamos antes de entrar.",
+  "email rate limit exceeded":
+    "Enviamos demasiados correos en poco tiempo. Espera unos minutos e inténtalo de nuevo.",
+  over_email_send_rate_limit:
+    "Enviamos demasiados correos en poco tiempo. Espera unos minutos e inténtalo de nuevo.",
+  "For security purposes, you can only request this after":
+    "Espera unos segundos antes de pedir otro correo.",
+  "Password should be at least": "La contraseña es demasiado corta.",
+  weak_password: "La contraseña es demasiado débil. Usa al menos 8 caracteres con letras y números.",
 };
 
 export function friendlyError(message: string | undefined | null): string {
