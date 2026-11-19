@@ -12,12 +12,12 @@ import {
 import {
   EPISODIC_ACTIONS,
   LONG_TERM_QUESTIONS,
-  PROCEDURAL_TRIALS,
+  PROCEDURAL_ROUNDS,
+  PROCEDURAL_TRIALS_PER_ROUND,
   SEMANTIC_ITEMS,
   SENSORY_TRIALS,
   SHORT_TERM_TRIALS,
   WORKING_TRIALS,
-  expectedProcedural,
   scoreMemory,
   type MemoryResponses,
 } from "./memory";
@@ -49,13 +49,19 @@ describe("scoreAttention", () => {
   });
 });
 
+const SEQUENCE = [4, 0, 7, 2, 5];
+
 const perfectMemory = (): MemoryResponses => ({
   shortTerm: [SHORT_TERM_TRIALS[0]],
   working: WORKING_TRIALS.map((t) => t.expected.join("-")),
   sensory: SENSORY_TRIALS.map((t) => [...t]),
   semantic: SEMANTIC_ITEMS.map((s) => s.answer),
   episodic: EPISODIC_ACTIONS.map((a) => a.key),
-  procedural: PROCEDURAL_TRIALS.map((t) => t.map((k) => ({ response: expectedProcedural(k), rt: 800 }))),
+  procedural: Array.from({ length: PROCEDURAL_ROUNDS * PROCEDURAL_TRIALS_PER_ROUND }, (_, t) => ({
+    positions: [...SEQUENCE],
+    taps: [...SEQUENCE],
+    rt: 4000 - t * 200,
+  })),
   longTerm: LONG_TERM_QUESTIONS.map((q) => q.answer),
 });
 
@@ -66,12 +72,22 @@ describe("scoreMemory", () => {
     expect(result.metrics.max_score).toBe(46);
   });
 
-  it("takes the best short-term trial, ignores late procedural answers and reads loose working answers", () => {
+  it("takes the best short-term trial, ignores late or misordered procedural answers and reads loose working answers", () => {
     const r = perfectMemory();
     r.shortTerm = [["reloj", "lapiz", "cuchara", "llave"], ["cuchara", "lapiz", "llave", null]];
     r.working[0] = "13 ab";
-    r.procedural[2][0] = { response: "table", rt: 5000 };
-    const subs = Object.fromEntries(scoreMemory(r).metrics.subscales.map((s) => [s.key, s.score]));
-    expect(subs).toMatchObject({ short_term: 3, working: 13, procedural: 8 });
+    r.procedural[8].rt = 5000; // over the round-3 limit
+    r.procedural[1].taps = [4, 0, 2, 7, 5]; // wrong order
+    const result = scoreMemory(r);
+    const subs = Object.fromEntries(result.metrics.subscales.map((s) => [s.key, s.score]));
+    expect(subs).toMatchObject({ short_term: 3, working: 13, procedural: 7 });
+    expect(result.metrics.procedural_round_ms).toEqual([3800, 3200, 2700]);
+    expect(result.metrics.procedural_gain_pct).toBe(29);
+  });
+
+  it("rejects a procedural sequence that changes between trials", () => {
+    const r = perfectMemory();
+    r.procedural[3].positions = [0, 1, 2, 3, 4];
+    expect(() => scoreMemory(r)).toThrow();
   });
 });

@@ -10,8 +10,12 @@ import {
   LONG_TERM_QUESTIONS,
   LONG_TERM_TEXT,
   OBJECTS,
-  PROCEDURAL_TRIALS,
-  PROCEDURAL_WINDOW_MS,
+  PROCEDURAL_GRID,
+  PROCEDURAL_LENGTH,
+  PROCEDURAL_MAX_MS,
+  PROCEDURAL_ROUNDS,
+  PROCEDURAL_SHOW_MS,
+  PROCEDURAL_TRIALS_PER_ROUND,
   SEMANTIC_ITEMS,
   SENSORY_TRIALS,
   SHORT_TERM_ITEM_MS,
@@ -21,7 +25,6 @@ import {
   type Intensity,
   type MemoryResponses,
   type ObjectKey,
-  type ProceduralResponse,
 } from "@/lib/instruments/memory";
 import { cn } from "@/lib/utils";
 import {
@@ -29,7 +32,6 @@ import {
   now,
   OrderPicker,
   playClap,
-  playKnock,
   Progress,
   SectionIntro,
   shuffled,
@@ -415,90 +417,102 @@ export function Episodic({ number, total, onDone }: SectionProps<MemoryResponses
 
 // 6. Procedural -------------------------------------------------------------------
 
+/** One random sequence of distinct cells, reused in every trial (that repetition is what gets learned). */
+function proceduralSequence() {
+  return shuffled(Array.from({ length: PROCEDURAL_GRID }, (_, i) => i)).slice(0, PROCEDURAL_LENGTH);
+}
+
+type ProceduralTrial = MemoryResponses["procedural"][number];
+
 export function Procedural({ number, total, onDone }: SectionProps<MemoryResponses["procedural"]>) {
   const sleep = useSleep();
-  const [phase, setPhase] = useState<"intro" | "run">("intro");
+  const [sequence] = useState(proceduralSequence);
+  const [phase, setPhase] = useState<"intro" | "show" | "answer" | "pause">("intro");
   const [trial, setTrial] = useState(0);
-  const [knocks, setKnocks] = useState(0);
-  const [waiting, setWaiting] = useState(false);
-  const pending = useRef<{ resolve: (r: { response: ProceduralResponse | null; rt: number | null }) => void; t: number } | null>(null);
+  const [taps, setTaps] = useState<number[]>([]);
+  const results = useRef<ProceduralTrial[]>([]);
+  const answer = useRef<{ start: number; taps: number[]; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const trials = PROCEDURAL_ROUNDS * PROCEDURAL_TRIALS_PER_ROUND;
+  const round = Math.floor(trial / PROCEDURAL_TRIALS_PER_ROUND);
 
-  async function stimulus(n: 1 | 2) {
-    for (let k = 0; k < n; k++) {
-      playKnock();
-      setKnocks(k + 1);
-      await sleep(220);
-    }
+  async function present(t: number) {
+    setTrial(t);
+    setTaps([]);
+    setPhase("pause");
+    await sleep(t % PROCEDURAL_TRIALS_PER_ROUND === 0 ? 1500 : 800);
+    setPhase("show");
+    await sleep(PROCEDURAL_SHOW_MS[Math.floor(t / PROCEDURAL_TRIALS_PER_ROUND)]);
+    setPhase("answer");
+    answer.current = { start: now(), taps: [], timer: setTimeout(() => finishTrial(t, null), PROCEDURAL_MAX_MS) };
   }
 
-  async function run() {
-    setPhase("run");
-    const results: MemoryResponses["procedural"] = [];
-    for (let t = 0; t < PROCEDURAL_TRIALS.length; t++) {
-      setTrial(t);
-      await sleep(1200);
-      const row: MemoryResponses["procedural"][number] = [];
-      for (const n of PROCEDURAL_TRIALS[t]) {
-        setKnocks(0);
-        await sleep(500);
-        await stimulus(n);
-        const window = PROCEDURAL_WINDOW_MS[t];
-        const answer = await new Promise<{ response: ProceduralResponse | null; rt: number | null }>((resolve) => {
-          pending.current = { resolve, t: now() };
-          setWaiting(true);
-          setTimeout(() => {
-            if (pending.current?.resolve === resolve) {
-              pending.current = null;
-              resolve({ response: null, rt: null });
-            }
-          }, window);
-        });
-        setWaiting(false);
-        row.push(answer);
-      }
-      results.push(row);
-    }
-    onDone(results);
+  function finishTrial(t: number, rt: number | null) {
+    const a = answer.current;
+    if (!a) return;
+    clearTimeout(a.timer);
+    answer.current = null;
+    results.current.push({ positions: [...sequence], taps: a.taps, rt });
+    if (t + 1 === trials) onDone(results.current);
+    else void present(t + 1);
   }
 
-  function respond(response: ProceduralResponse) {
-    const p = pending.current;
-    if (!p) return;
-    pending.current = null;
-    p.resolve({ response, rt: Math.round(now() - p.t) });
+  function tap(cell: number) {
+    const a = answer.current;
+    if (!a || a.taps.includes(cell)) return;
+    a.taps = [...a.taps, cell];
+    setTaps(a.taps);
+    if (a.taps.length === PROCEDURAL_LENGTH) finishTrial(trial, Math.round(now() - a.start));
   }
 
   if (phase === "intro")
     return (
-      <SectionIntro number={number} total={total} title="Memoria procedimental" onStart={() => void run()}>
-        <p>Sube el volumen. Vas a escuchar golpes:</p>
-        <ul className="list-disc space-y-1 pl-6">
-          <li>
-            <strong>1 golpe:</strong> toca «Tocar la mesa».
-          </li>
-          <li>
-            <strong>2 golpes:</strong> toca «Levantar la mano».
-          </li>
-        </ul>
-        <p>Son 3 rondas y cada una es más rápida. Responde lo más rápido que puedas sin equivocarte.</p>
+      <SectionIntro number={number} total={total} title="Memoria procedimental" onStart={() => void present(0)}>
+        <p>
+          En una cuadrícula van a aparecer los números del 1 al {PROCEDURAL_LENGTH}. Fíjate dónde está cada uno: después
+          se borran.
+        </p>
+        <p>Cuando se borren, toca las casillas en orden: primero donde estaba el 1, luego el 2, y así hasta el {PROCEDURAL_LENGTH}.</p>
+        <p>
+          Son {PROCEDURAL_ROUNDS} rondas de {PROCEDURAL_TRIALS_PER_ROUND} intentos. En cada ronda los números se ven menos
+          tiempo. Responde lo más rápido que puedas sin equivocarte.
+        </p>
       </SectionIntro>
     );
 
+  const label =
+    phase === "show" ? "Memoriza el orden" : phase === "answer" ? "Toca las casillas en orden" : "Prepárate…";
+
   return (
     <Stage>
-      <Progress value={trial} total={PROCEDURAL_TRIALS.length} label="Ronda" />
-      <div className="flex h-16 items-center gap-3" aria-live="polite">
-        {Array.from({ length: knocks }, (_, i) => (
-          <span key={i} className="size-12 rounded-full bg-blue" />
-        ))}
-      </div>
-      <div className="grid w-full max-w-lg grid-cols-2 gap-4">
-        <Button size="lg" variant="outline" className="h-28 text-xl" disabled={!waiting} onPointerDown={() => respond("table")}>
-          ✋ Tocar la mesa
-        </Button>
-        <Button size="lg" variant="outline" className="h-28 text-xl" disabled={!waiting} onPointerDown={() => respond("hand")}>
-          🙋 Levantar la mano
-        </Button>
+      <p className="text-sm text-muted-foreground">
+        Ronda {round + 1} de {PROCEDURAL_ROUNDS} · Intento {(trial % PROCEDURAL_TRIALS_PER_ROUND) + 1} de{" "}
+        {PROCEDURAL_TRIALS_PER_ROUND}
+      </p>
+      <h3 className="text-2xl font-semibold" aria-live="polite">
+        {label}
+      </h3>
+      <div className="grid w-full max-w-sm grid-cols-3 gap-3">
+        {Array.from({ length: PROCEDURAL_GRID }, (_, cell) => {
+          const shown = phase === "show" ? sequence.indexOf(cell) : -1;
+          const tapped = taps.indexOf(cell);
+          return (
+            <button
+              key={cell}
+              type="button"
+              aria-label={`Casilla ${cell + 1}`}
+              disabled={phase !== "answer" || tapped >= 0}
+              onPointerDown={() => tap(cell)}
+              className={cn(
+                "flex aspect-square items-center justify-center rounded-2xl border-2 bg-card text-4xl font-bold transition-colors",
+                shown >= 0 && "border-blue bg-blue text-white",
+                tapped >= 0 && "border-cyan bg-cyan/20",
+                phase === "answer" && tapped < 0 && "hover:border-blue",
+              )}
+            >
+              {shown >= 0 ? shown + 1 : tapped >= 0 ? "✓" : ""}
+            </button>
+          );
+        })}
       </div>
     </Stage>
   );

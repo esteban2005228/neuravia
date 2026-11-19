@@ -73,21 +73,6 @@ export function playClap(intensity: "soft" | "loud") {
   src.start();
 }
 
-/** A knock on a table: a low, short thump. */
-export function playKnock() {
-  const ac = audio();
-  if (!ac) return;
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.frequency.setValueAtTime(180, ac.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(60, ac.currentTime + 0.12);
-  gain.gain.setValueAtTime(0.9, ac.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
-  osc.connect(gain).connect(ac.destination);
-  osc.start();
-  osc.stop(ac.currentTime + 0.16);
-}
-
 /** Unlocks audio on iOS/Safari; call from a click. */
 export function primeAudio() {
   audio();
