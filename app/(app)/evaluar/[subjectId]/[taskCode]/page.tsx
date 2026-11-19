@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
-import { isTaskCode } from "@/lib/scoring";
+import { InstrumentView } from "@/components/instruments/instrument-view";
+import { isInstrumentCode, isTaskCode } from "@/lib/scoring";
 import { TaskRunner } from "./task-runner";
 
 export const metadata: Metadata = { title: "Prueba" };
@@ -17,6 +18,15 @@ export default async function TaskPage({ params }: { params: Promise<{ subjectId
     supabase.from("tasks").select("name, active").eq("code", taskCode).maybeSingle(),
   ]);
   if (!subject || !task?.active) notFound();
+
+  const common = {
+    subjectId: subject.id,
+    subjectName: subject.display_name,
+    taskName: task.name,
+    isSelf: subject.user_id === user.id,
+  };
+  if (isInstrumentCode(taskCode)) return <InstrumentView {...common} taskCode={taskCode} />;
+  if (taskCode !== "A2_flanker" && taskCode !== "M2_digit_span") notFound();
 
   return (
     <TaskRunner

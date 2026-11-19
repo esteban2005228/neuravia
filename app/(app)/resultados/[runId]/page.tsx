@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireProfile } from "@/lib/auth";
+import { SubscaleResult } from "@/components/instruments/subscale-result";
+import { isSubscaleList } from "@/lib/instruments/types";
 import { LEVEL_LABELS } from "@/lib/scoring/levels";
 
 export const metadata: Metadata = { title: "Resultado" };
@@ -52,6 +54,38 @@ export default async function ResultPage({ params }: { params: Promise<{ runId: 
 
   const level = LEVEL_LABELS[run.level];
   const index = Math.round(Number(run.index_score));
+  const subscales = (run.metrics as { subscales?: unknown } | null)?.subscales;
+
+  if (isSubscaleList(subscales)) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <Card>
+          <CardContent className="space-y-6 p-6 sm:p-8">
+            <p className="text-sm text-muted-foreground">{run.assessments.subjects?.display_name}</p>
+            <SubscaleResult
+              title={run.task_code === "ATT_instrument" ? "Atención" : "Memoria"}
+              date={new Date(run.completed_at).toLocaleDateString("es-MX", { dateStyle: "long" })}
+              index={index}
+              level={run.level}
+              subscales={subscales}
+            />
+            <Alert variant="info">
+              Este resultado es orientativo y no es un diagnóstico. Cansancio, sueño o distracciones pueden afectar el
+              desempeño.
+            </Alert>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild variant="secondary">
+                <Link href={`/evaluar/${run.assessments.subject_id}`}>Volver a las pruebas</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/juegos">Practicar con minijuegos</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

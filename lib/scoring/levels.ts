@@ -16,22 +16,22 @@ export function levelFor(index: number): ResultLevel {
 
 export const LEVEL_LABELS: Record<ResultLevel, { label: string; description: string; tone: "cyan" | "lavender" | "amber" | "coral" }> = {
   strength: {
-    label: "Fortaleza",
+    label: "Desempeño alto",
     description: "Tu desempeño en esta prueba fue alto.",
     tone: "cyan",
   },
   expected: {
-    label: "Esperado",
+    label: "Desempeño adecuado",
     description: "Tu desempeño está dentro de lo esperado.",
     tone: "lavender",
   },
   watch: {
-    label: "Vigilar",
+    label: "Conviene practicar",
     description: "Conviene practicar y repetir la prueba más adelante.",
     tone: "amber",
   },
   refer: {
-    label: "Sugerir valoración",
+    label: "Sugerimos una valoración",
     description: "Te sugerimos comentar este resultado con un profesional de la salud.",
     tone: "coral",
   },
