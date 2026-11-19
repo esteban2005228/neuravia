@@ -5,6 +5,7 @@ import { ResultsList } from "@/components/results-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAccessibleSubjects, getOwnSubject, requireProfile } from "@/lib/auth";
+import { KINSHIP_LABEL, MAX_RELATIVES } from "@/lib/labels";
 
 export const metadata: Metadata = { title: "Inicio" };
 
@@ -52,14 +53,16 @@ export default async function HomePage() {
         <div>
           <h1 className="text-2xl font-semibold sm:text-3xl">Hola, {profile.display_name}</h1>
           <p className="mt-1 text-muted-foreground">
-            {profile.role === "professional" ? "Tus pacientes vinculados." : "Las personas a las que acompañas."}
+            {profile.role === "professional"
+              ? "Tus pacientes vinculados."
+              : `Los familiares a los que acompañas (${subjects.length} de ${MAX_RELATIVES}).`}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Button asChild>
             <Link href="/vincular">{profile.role === "professional" ? "Vincular paciente" : "Vincular familiar"}</Link>
           </Button>
-          {profile.role === "companion" && (
+          {profile.role === "companion" && subjects.length < MAX_RELATIVES && (
             <Button asChild variant="outline">
               <Link href="/pacientes/nuevo">Registrar familiar sin correo</Link>
             </Button>
@@ -82,11 +85,12 @@ export default async function HomePage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {subjects.map(({ subject }) => (
+          {subjects.map(({ subject, kinship }) => (
             <Card key={subject.id}>
               <CardHeader>
                 <CardTitle>{subject.display_name}</CardTitle>
                 <CardDescription>
+                  {kinship && `${KINSHIP_LABEL[kinship]} · `}
                   {new Date().getFullYear() - subject.birth_year} años aprox.
                   {subject.user_id === null && " · sin cuenta propia"}
                 </CardDescription>

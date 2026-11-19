@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireProfile, type Subject } from "@/lib/auth";
+import { KINSHIP_LABEL, STUDY_AREA_LABEL } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
 import { AccountForm } from "./account-form";
 import { DeleteAccountForm } from "./delete-account-form";
@@ -64,7 +65,7 @@ export default async function AccountPage() {
     .eq("created_by", user.id);
   const { data: links } = await supabase
     .from("links")
-    .select("id, relation, created_at, linked_user_id, subjects(display_name, user_id)")
+    .select("id, relation, kinship, created_at, linked_user_id, subjects(display_name, user_id)")
     .eq("status", "active")
     .order("created_at", { ascending: false });
 
@@ -81,11 +82,17 @@ export default async function AccountPage() {
         <CardHeader>
           <CardTitle>Mi cuenta</CardTitle>
           <CardDescription>
-            {profile.display_name} · {ROLE_LABEL[profile.role]} · {user.email}
+            {profile.display_name} · {ROLE_LABEL[profile.role]}
+            {profile.study_area && ` · ${STUDY_AREA_LABEL[profile.study_area]}`} · {user.email}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <AccountForm key={profile.display_name} displayName={profile.display_name} />
+          <AccountForm
+            key={`${profile.display_name}-${profile.study_area}`}
+            displayName={profile.display_name}
+            studyArea={profile.study_area}
+            isProfessional={profile.role === "professional"}
+          />
           <Button asChild variant="outline" size="sm">
             <Link href="/cuenta/contrasena">Cambiar contraseña</Link>
           </Button>
@@ -145,7 +152,7 @@ export default async function AccountPage() {
                         ? `${nameById.get(link.linked_user_id) ?? ""} · ${
                             link.relation === "professional" ? "Profesional" : "Acompañante"
                           }`
-                        : link.subjects?.display_name}
+                        : `${link.subjects?.display_name ?? ""}${link.kinship ? ` · ${KINSHIP_LABEL[link.kinship]}` : ""}`}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Desde {new Date(link.created_at).toLocaleDateString("es-MX", { dateStyle: "medium" })}

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 
 import { redeemLinkCode } from "@/app/actions/links";
 import { FormMessage, SubmitButton } from "@/components/form-bits";
+import { KinshipField } from "@/components/kinship-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -23,6 +24,7 @@ export function RedeemForm({ role }: { role: "patient" | "professional" | "compa
           required
         />
       </div>
+      {role === "companion" && <KinshipField label="¿Qué parentesco tienes con esta persona?" />}
       <FormMessage state={state} />
       <SubmitButton>{role === "professional" ? "Vincular paciente" : "Vincular familiar"}</SubmitButton>
     </form>

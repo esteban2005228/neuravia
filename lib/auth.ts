@@ -38,15 +38,15 @@ export async function getAccessibleSubjects() {
   const { supabase, user, profile } = await requireProfile();
   if (profile.role === "patient") {
     const own = await getOwnSubject();
-    return own ? [{ subject: own, relation: "self" as const, linkId: null }] : [];
+    return own ? [{ subject: own, relation: "self" as const, kinship: null, linkId: null }] : [];
   }
   const { data } = await supabase
     .from("links")
-    .select("id, relation, subjects(*)")
+    .select("id, relation, kinship, subjects(*)")
     .eq("linked_user_id", user.id)
     .eq("status", "active")
     .order("created_at", { ascending: false });
   return (data ?? [])
     .filter((l) => l.subjects)
-    .map((l) => ({ subject: l.subjects as Subject, relation: l.relation, linkId: l.id }));
+    .map((l) => ({ subject: l.subjects as Subject, relation: l.relation, kinship: l.kinship, linkId: l.id }));
 }

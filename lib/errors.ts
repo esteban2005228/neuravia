@@ -5,6 +5,8 @@ const MESSAGES: Record<string, string> = {
   only_patients: "Solo los pacientes pueden generar un código de vinculación.",
   only_professionals_or_companions: "Solo un Profesional o un Acompañante puede canjear un código.",
   invalid_or_expired_code: "El código no es válido o ya expiró. Pide uno nuevo al paciente.",
+  companion_limit_reached: "Ya acompañas a 2 familiares, que es el máximo.",
+  kinship_required: "Elige el parentesco.",
   link_not_found: "Ese vínculo ya no está activo.",
   not_allowed: "No tienes permiso para hacer esto.",
   consent_required: "Falta el consentimiento del paciente para usar el servicio.",

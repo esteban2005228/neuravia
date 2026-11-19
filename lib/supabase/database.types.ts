@@ -12,14 +12,23 @@ type AssessmentMode = "self" | "professional" | "companion";
 type AssessmentStatus = "in_progress" | "completed" | "abandoned";
 type ResultLevel = "strength" | "expected" | "watch" | "refer";
 type CognitiveDomain = "attention" | "memory";
+export type Kinship = "mother" | "father" | "child" | "sibling" | "partner" | "grandparent" | "uncle_aunt" | "cousin" | "other";
+export type StudyArea =
+  | "clinical_psychology"
+  | "neuropsychology"
+  | "psychiatry"
+  | "neurology"
+  | "general_medicine"
+  | "psychology_student"
+  | "other";
 
 export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: { id: string; role: UserRole; display_name: string; created_at: string };
-        Insert: { id: string; role: UserRole; display_name: string; created_at?: string };
-        Update: { display_name?: string };
+        Row: { id: string; role: UserRole; display_name: string; study_area: StudyArea | null; created_at: string };
+        Insert: { id: string; role: UserRole; display_name: string; study_area?: StudyArea | null; created_at?: string };
+        Update: { display_name?: string; study_area?: StudyArea | null };
         Relationships: [];
       };
       subjects: {
@@ -70,6 +79,7 @@ export type Database = {
           subject_id: string;
           linked_user_id: string;
           relation: LinkRelation;
+          kinship: Kinship | null;
           status: LinkStatus;
           created_at: string;
           revoked_at: string | null;
@@ -185,11 +195,12 @@ export type Database = {
           p_education_years: number | null;
           p_notice_version: string;
           p_research_consent?: boolean;
+          p_kinship?: Kinship;
         };
         Returns: string;
       };
-      create_link_code: { Args: Record<string, never>; Returns: string };
-      redeem_link_code: { Args: { p_code: string }; Returns: string };
+      create_link_code: { Args: { p_subject_id?: string }; Returns: string };
+      redeem_link_code: { Args: { p_code: string; p_kinship?: Kinship }; Returns: string };
       revoke_link: { Args: { p_link_id: string }; Returns: undefined };
       set_consent: {
         Args: { p_subject_id: string; p_purpose: ConsentPurpose; p_granted: boolean; p_notice_version: string };
