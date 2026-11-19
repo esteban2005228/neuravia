@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { friendlyError, type FormState } from "@/lib/errors";
+import { NOTICE_VERSION } from "@/lib/privacy";
+import { parseSetup } from "@/lib/setup";
 import { createClient } from "@/lib/supabase/server";
 
 async function siteUrl() {
@@ -35,18 +37,31 @@ export async function signIn(_: FormState, formData: FormData): Promise<FormStat
   redirect(safeNext(formData.get("next")));
 }
 
+/** Creates the account with the setup answers; a database trigger turns them into profile + consent. */
 export async function signUp(_: FormState, formData: FormData): Promise<FormState> {
+  const setup = parseSetup(formData);
+  if ("error" in setup) return { error: setup.error };
   const parsed = credentials.safeParse({ email: formData.get("email"), password: formData.get("password") });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
+  const s = setup.data;
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     ...parsed.data,
-    options: { emailRedirectTo: `${await siteUrl()}/auth/callback?next=/onboarding` },
+    options: {
+      emailRedirectTo: `${await siteUrl()}/auth/callback?next=/inicio`,
+      data: {
+        role: s.role,
+        display_name: s.displayName,
+        terms_accepted: true,
+        notice_version: NOTICE_VERSION,
+        ...(s.role === "patient" ? { birth_year: s.birthYear, research_consent: s.researchConsent } : {}),
+      },
+    },
   });
   if (error) return { error: friendlyError(error.message) };
-  if (data.session) redirect("/onboarding");
-  return { ok: "Te enviamos un correo. Abre el enlace para confirmar tu cuenta y continuar." };
+  if (data.session) redirect("/inicio");
+  return { ok: "¡Listo! Te enviamos un correo. Abre el enlace para confirmar tu cuenta y entrarás directo a Neuravia." };
 }
 
 export async function signOut() {

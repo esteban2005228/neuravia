@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { friendlyError, type FormState } from "@/lib/errors";
 import { NOTICE_VERSION } from "@/lib/privacy";
+import { parseSetup } from "@/lib/setup";
 import { createClient } from "@/lib/supabase/server";
 
 const currentYear = new Date().getFullYear();
@@ -17,47 +18,23 @@ const patientFields = {
     .max(currentYear - 18, "Neuravia está diseñada para personas de 18 a 45 años."),
 };
 
-const base = z.object({
-  role: z.enum(["patient", "professional", "companion"]),
-  displayName: z.string().trim().min(1, "Escribe tu nombre.").max(80),
-});
-
 export async function completeOnboarding(_: FormState, formData: FormData): Promise<FormState> {
-  const parsed = base.safeParse({ role: formData.get("role"), displayName: formData.get("displayName") });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const parsed = parseSetup(formData);
+  if ("error" in parsed) return { error: parsed.error };
+  const setup = parsed.data;
 
   const supabase = await createClient();
-
-  if (parsed.data.role === "patient") {
-    const patient = z
-      .object({
-        ...patientFields,
-        serviceConsent: z.literal("on", { message: "Para usar Neuravia necesitas aceptar el aviso de privacidad." }),
-      })
-      .safeParse({
-        birthYear: formData.get("birthYear"),
-        serviceConsent: formData.get("serviceConsent"),
-      });
-    if (!patient.success) return { error: patient.error.issues[0].message };
-
-    const { error } = await supabase.rpc("complete_onboarding", {
-      p_role: "patient",
-      p_display_name: parsed.data.displayName,
-      p_birth_year: patient.data.birthYear,
-      p_notice_version: NOTICE_VERSION,
-      p_research_consent: formData.get("researchConsent") === "on",
-    });
-    if (error) return { error: friendlyError(error.message) };
-  } else {
-    if (formData.get("termsAccepted") !== "on") {
-      return { error: "Para continuar necesitas aceptar el aviso de privacidad." };
-    }
-    const { error } = await supabase.rpc("complete_onboarding", {
-      p_role: parsed.data.role,
-      p_display_name: parsed.data.displayName,
-    });
-    if (error) return { error: friendlyError(error.message) };
-  }
+  const { error } =
+    setup.role === "patient"
+      ? await supabase.rpc("complete_onboarding", {
+          p_role: "patient",
+          p_display_name: setup.displayName,
+          p_birth_year: setup.birthYear,
+          p_notice_version: NOTICE_VERSION,
+          p_research_consent: setup.researchConsent,
+        })
+      : await supabase.rpc("complete_onboarding", { p_role: setup.role, p_display_name: setup.displayName });
+  if (error) return { error: friendlyError(error.message) };
 
   redirect("/inicio");
 }

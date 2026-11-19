@@ -10,7 +10,7 @@ export default function RegisterPage() {
     <Card className="glass">
       <CardHeader>
         <CardTitle>Crear cuenta</CardTitle>
-        <CardDescription>Después elegirás si eres paciente, profesional o acompañante.</CardDescription>
+        <CardDescription>Solo pedimos lo necesario para interpretar tus resultados.</CardDescription>
       </CardHeader>
       <CardContent>
         <RegisterForm />
