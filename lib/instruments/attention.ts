@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { clampIndex, levelFor } from "@/lib/scoring/levels";
+import { pick } from "./random";
 import type { Subscale } from "./types";
 
 /**
@@ -9,12 +10,15 @@ import type { Subscale } from "./types";
  * (to present items) and the server (to score them from raw responses).
  */
 export const ATTENTION_CODE = "ATT_instrument" as const;
-export const ATTENTION_VERSION = "1.0";
+export const ATTENTION_VERSION = "1.1";
 
-// 1. Selective: count how many times the target appears. Expected counts from the instrument.
+// 1. Selective: count how many times the target appears. 5 series with a different random count each,
+// within the instrument's range (2 to 12).
 export const SELECTIVE_TARGET = "★";
 export const SELECTIVE_DISTRACTORS = ["☆", "✦", "◆", "●"];
-export const SELECTIVE_COUNTS = [2, 4, 5, 10, 3, 6, 8, 12];
+export const SELECTIVE_SERIES = 5;
+export const SELECTIVE_MIN = 2;
+export const SELECTIVE_MAX = 12;
 export const SELECTIVE_STIMULUS_MS = 550;
 export const SELECTIVE_GAP_MS = 250;
 
@@ -67,27 +71,53 @@ export const ALTERNATING_SHAPES = [
   { key: "square", label: "Cuadrado" },
   { key: "star", label: "Estrella" },
 ] as const;
-export const ALTERNATING_STEPS = [
-  { text: "Toma el color azul y dibuja un círculo.", color: "blue", shape: "circle" },
-  { text: "Ahora toma el color rojo y dibuja un triángulo.", color: "red", shape: "triangle" },
-  { text: "Finalmente toma el amarillo y dibuja un cuadrado.", color: "yellow", shape: "square" },
-] as const;
+export type AlternatingColor = (typeof ALTERNATING_COLORS)[number]["key"];
+export type AlternatingShape = (typeof ALTERNATING_SHAPES)[number]["key"];
+export const ALTERNATING_STEPS = 3;
+const SHAPE_NOUN: Record<AlternatingShape, string> = {
+  circle: "un círculo",
+  triangle: "un triángulo",
+  square: "un cuadrado",
+  star: "una estrella",
+};
+const STEP_LEAD = ["Toma", "Ahora toma", "Finalmente toma"];
+/** Instruction text for a step, e.g. "Ahora toma el color verde y dibuja una estrella." */
+export function alternatingText(step: number, color: AlternatingColor, shape: AlternatingShape) {
+  const label = ALTERNATING_COLORS.find((c) => c.key === color)!.label.toLowerCase();
+  return `${STEP_LEAD[step] ?? "Toma"} el color ${label} y dibuja ${SHAPE_NOUN[shape]}.`;
+}
+
+const colorKeys = ALTERNATING_COLORS.map((c) => c.key) as [AlternatingColor, ...AlternatingColor[]];
+const shapeKeys = ALTERNATING_SHAPES.map((c) => c.key) as [AlternatingShape, ...AlternatingShape[]];
 
 export const attentionResponsesSchema = z.object({
-  selective: z.array(z.number().int().min(0).max(99).nullable()).length(SELECTIVE_COUNTS.length),
+  selective: z
+    .array(
+      z.object({
+        count: z.number().int().min(SELECTIVE_MIN).max(SELECTIVE_MAX),
+        answer: z.number().int().min(0).max(99).nullable(),
+      }),
+    )
+    .length(SELECTIVE_SERIES),
   focalized: z.object({ found: z.number().int().min(0).max(FOCALIZED_STARS), ms: z.number().nonnegative().max(600_000) }),
   sustained: z.array(z.number().int().min(0).max(3).nullable()).length(SUSTAINED_QUESTIONS.length),
   divided: z.object({ presses: z.array(z.number().nonnegative().max(600_000)).max(200) }),
   alternating: z
-    .array(z.object({ color: z.string().max(10).nullable(), shape: z.string().max(10).nullable() }))
-    .length(ALTERNATING_STEPS.length),
+    .array(
+      z.object({
+        expected: z.object({ color: z.enum(colorKeys), shape: z.enum(shapeKeys) }),
+        color: z.string().max(10).nullable(),
+        shape: z.string().max(10).nullable(),
+      }),
+    )
+    .length(ALTERNATING_STEPS),
 });
 export type AttentionResponses = z.infer<typeof attentionResponsesSchema>;
 
 export function scoreAttention(raw: unknown) {
   const r = attentionResponsesSchema.parse(raw);
 
-  const selective = r.selective.filter((answer, i) => answer === SELECTIVE_COUNTS[i]).length;
+  const selective = r.selective.filter((s) => s.answer === s.count).length;
 
   const focalized =
     r.focalized.found < FOCALIZED_STARS ? 0 : r.focalized.ms < 30_000 ? 2 : r.focalized.ms <= 60_000 ? 1 : 0;
@@ -107,17 +137,17 @@ export function scoreAttention(raw: unknown) {
   }
   const divided = Math.max(0, hitTargets.size * 2 - falseAlarms);
 
-  const alternating = r.alternating.reduce<number>((sum, a, i) => {
-    const step = ALTERNATING_STEPS[i];
-    return sum + (a.color === step.color ? 1 : 0) + (a.shape === step.shape ? 1 : 0);
-  }, 0);
+  const alternating = r.alternating.reduce<number>(
+    (sum, a) => sum + (a.color === a.expected.color ? 1 : 0) + (a.shape === a.expected.shape ? 1 : 0),
+    0,
+  );
 
   const subscales: Subscale[] = [
-    { key: "selective", label: "Atención selectiva", score: selective, max: SELECTIVE_COUNTS.length },
+    { key: "selective", label: "Atención selectiva", score: selective, max: SELECTIVE_SERIES },
     { key: "focalized", label: "Atención focalizada", score: focalized, max: 2 },
     { key: "sustained", label: "Atención sostenida", score: sustained, max: SUSTAINED_QUESTIONS.length * 2 },
     { key: "divided", label: "Atención dividida", score: divided, max: DIVIDED_TARGETS.length * 2 },
-    { key: "alternating", label: "Atención alternante", score: alternating, max: ALTERNATING_STEPS.length * 2 },
+    { key: "alternating", label: "Atención alternante", score: alternating, max: ALTERNATING_STEPS * 2 },
   ];
   const rawScore = subscales.reduce((s, x) => s + x.score, 0);
   const max = subscales.reduce((s, x) => s + x.max, 0);
@@ -136,4 +166,21 @@ export function scoreAttention(raw: unknown) {
     indexScore,
     level: levelFor(indexScore),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Random content for each run (client side). The server scores what was shown.
+// ---------------------------------------------------------------------------
+
+/** Distinct target counts for the selective series. */
+export function randomSelectiveCounts() {
+  const range = Array.from({ length: SELECTIVE_MAX - SELECTIVE_MIN + 1 }, (_, i) => SELECTIVE_MIN + i);
+  return pick(range, SELECTIVE_SERIES);
+}
+
+/** Three steps, each with a different color and a different shape. */
+export function randomAlternatingSteps() {
+  const colors = pick(colorKeys, ALTERNATING_STEPS);
+  const shapes = pick(shapeKeys, ALTERNATING_STEPS);
+  return colors.map((color, i) => ({ color, shape: shapes[i], text: alternatingText(i, color, shapes[i]) }));
 }

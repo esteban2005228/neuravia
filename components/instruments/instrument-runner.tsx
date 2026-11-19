@@ -8,7 +8,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ATTENTION_CODE, ATTENTION_VERSION, type AttentionResponses } from "@/lib/instruments/attention";
-import { MEMORY_VERSION, type MemoryResponses } from "@/lib/instruments/memory";
+import { MEMORY_VERSION, type LongTermFact, type MemoryResponses } from "@/lib/instruments/memory";
 import type { InstrumentCode } from "@/lib/scoring";
 import { Alternating, Divided, Focalized, Selective, Sustained } from "./attention-sections";
 import { primeAudio } from "./kit";
@@ -16,8 +16,12 @@ import { Episodic, LongTermLearn, LongTermRecall, Procedural, Semantic, Sensory,
 
 type Stage = "ready" | "running" | "saving" | "error";
 
-/** Each step renders one exercise and stores its answer under `key`. */
-type Step = { key: string; View: React.ComponentType<{ onDone: (value: unknown) => void }> };
+/**
+ * Each step renders one exercise and stores its answer under `key`. `shared` holds the answers so far,
+ * so a later step can read what an earlier one showed (the long-term fact).
+ */
+type StepProps = { onDone: (value: unknown) => void; shared: Record<string, unknown> };
+type Step = { key: string; View: React.ComponentType<StepProps> };
 
 const ATTENTION_STEPS: Step[] = [
   { key: "selective", View: (p) => <Selective number={1} total={5} onDone={p.onDone} /> },
@@ -28,14 +32,17 @@ const ATTENTION_STEPS: Step[] = [
 ];
 
 const MEMORY_STEPS: Step[] = [
-  { key: "_learn", View: (p) => <LongTermLearn onDone={() => p.onDone(null)} /> },
+  { key: "_learn", View: (p) => <LongTermLearn onDone={p.onDone} /> },
   { key: "shortTerm", View: (p) => <ShortTerm number={1} total={7} onDone={p.onDone} /> },
   { key: "working", View: (p) => <Working number={2} total={7} onDone={p.onDone} /> },
   { key: "sensory", View: (p) => <Sensory number={3} total={7} onDone={p.onDone} /> },
   { key: "semantic", View: (p) => <Semantic number={4} total={7} onDone={p.onDone} /> },
   { key: "episodic", View: (p) => <Episodic number={5} total={7} onDone={p.onDone} /> },
   { key: "procedural", View: (p) => <Procedural number={6} total={7} onDone={p.onDone} /> },
-  { key: "longTerm", View: (p) => <LongTermRecall number={7} total={7} onDone={p.onDone} /> },
+  {
+    key: "longTerm",
+    View: (p) => <LongTermRecall number={7} total={7} fact={p.shared._learn as LongTermFact} onDone={p.onDone} />,
+  },
 ];
 
 export function InstrumentRunner({
@@ -59,6 +66,7 @@ export function InstrumentRunner({
   const [index, setIndex] = useState(0);
   const assessmentId = useRef<string>(undefined);
   const responses = useRef<Record<string, unknown>>({});
+  const [shared, setShared] = useState<Record<string, unknown>>({});
 
   async function begin() {
     primeAudio();
@@ -91,6 +99,7 @@ export function InstrumentRunner({
 
   function done(value: unknown) {
     responses.current[steps[index].key] = value;
+    setShared({ ...responses.current });
     window.scrollTo({ top: 0 });
     if (index + 1 === steps.length) void finish();
     else setIndex(index + 1);
@@ -136,7 +145,7 @@ export function InstrumentRunner({
   return (
     <Card className="mx-auto max-w-4xl">
       <CardContent className="p-6 sm:p-10">
-        <View key={index} onDone={done} />
+        <View key={index} onDone={done} shared={shared} />
       </CardContent>
     </Card>
   );

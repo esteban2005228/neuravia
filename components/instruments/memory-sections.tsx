@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   EPISODIC_ACTIONS,
   EPISODIC_ITEM_MS,
-  LONG_TERM_QUESTIONS,
-  LONG_TERM_TEXT,
+  longTermOptions,
+  longTermQuestions,
+  longTermText,
   OBJECTS,
   PROCEDURAL_GRID,
   PROCEDURAL_LENGTH,
@@ -18,12 +19,17 @@ import {
   PROCEDURAL_SHOW_MS,
   proceduralTrialOk,
   SEMANTIC_ITEMS,
-  SENSORY_TRIALS,
+  randomEpisodicActions,
+  randomLongTermFact,
+  randomObjectOrder,
+  randomSensoryTrials,
+  randomWorkingSequence,
   SHORT_TERM_ITEM_MS,
-  SHORT_TERM_TRIALS,
   WORKING_ITEM_MS,
-  WORKING_TRIALS,
+  WORKING_LENGTHS,
+  type ActionKey,
   type Intensity,
+  type LongTermFact,
   type MemoryResponses,
   type ObjectKey,
   type ProceduralTrial,
@@ -47,8 +53,10 @@ type SectionProps<T> = { number: number; total: number; onDone: (value: T) => vo
 
 // Long-term (learn) ---------------------------------------------------------------
 
-export function LongTermLearn({ onDone }: { onDone: () => void }) {
+export function LongTermLearn({ onDone }: { onDone: (fact: LongTermFact) => void }) {
   const [shown, setShown] = useState(false);
+  const [fact] = useState(randomLongTermFact);
+  const text = longTermText(fact);
   if (!shown)
     return (
       <SectionIntro
@@ -58,7 +66,7 @@ export function LongTermLearn({ onDone }: { onDone: () => void }) {
         startLabel="Ver el dato"
         onStart={() => {
           setShown(true);
-          speak(LONG_TERM_TEXT);
+          speak(text);
         }}
       >
         <p>Te daremos un dato. Recuérdalo bien: al final de la evaluación te preguntaremos por él.</p>
@@ -66,12 +74,12 @@ export function LongTermLearn({ onDone }: { onDone: () => void }) {
     );
   return (
     <Stage>
-      <p className="max-w-xl rounded-2xl border bg-card p-6 text-2xl font-semibold leading-relaxed">{LONG_TERM_TEXT}</p>
+      <p className="max-w-xl rounded-2xl border bg-card p-6 text-2xl font-semibold leading-relaxed">{text}</p>
       <Button
         size="lg"
         onClick={() => {
           stopSpeaking();
-          onDone();
+          onDone(fact);
         }}
       >
         Lo recordaré, continuar
@@ -96,12 +104,15 @@ export function ShortTerm({ number, total, onDone }: SectionProps<MemoryResponse
   const [current, setCurrent] = useState<ObjectKey | null>(null);
   const answers = useRef<MemoryResponses["shortTerm"]>([]);
   const [options] = useState(() => shuffled(Object.keys(OBJECTS) as ObjectKey[]));
+  const shown = useRef<ObjectKey[]>([]);
 
   async function present(t: number) {
+    // The second trial always uses a different order than the first.
+    shown.current = randomObjectOrder(answers.current[0]?.shown);
     setTrial(t);
     setPhase("show");
     await sleep(700);
-    for (const key of SHORT_TERM_TRIALS[t]) {
+    for (const key of shown.current) {
       setCurrent(key);
       speak(OBJECTS[key].label);
       await sleep(SHORT_TERM_ITEM_MS);
@@ -143,8 +154,8 @@ export function ShortTerm({ number, total, onDone }: SectionProps<MemoryResponse
         slots={4}
         render={objectView}
         onDone={(order) => {
-          answers.current[trial] = order;
-          const perfect = SHORT_TERM_TRIALS[trial].every((k, i) => order[i] === k);
+          answers.current[trial] = { shown: shown.current, given: order };
+          const perfect = shown.current.every((k, i) => order[i] === k);
           if (perfect || trial === 1) onDone(answers.current);
           else void present(1);
         }}
@@ -161,14 +172,16 @@ export function Working({ number, total, onDone }: SectionProps<MemoryResponses[
   const [trial, setTrial] = useState(0);
   const [current, setCurrent] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
-  const answers = useRef<string[]>([]);
+  const answers = useRef<MemoryResponses["working"]>([]);
+  const sequence = useRef<string[]>([]);
 
   async function present(t: number) {
+    sequence.current = randomWorkingSequence(WORKING_LENGTHS[t]);
     setTrial(t);
     setAnswer("");
     setPhase("show");
     await sleep(700);
-    for (const item of WORKING_TRIALS[t].sequence) {
+    for (const item of sequence.current) {
       setCurrent(item);
       speak(item);
       await sleep(WORKING_ITEM_MS);
@@ -191,20 +204,20 @@ export function Working({ number, total, onDone }: SectionProps<MemoryResponses[
   if (phase === "show")
     return (
       <Stage>
-        <Progress value={trial} total={WORKING_TRIALS.length} label="Serie" />
+        <Progress value={trial} total={WORKING_LENGTHS.length} label="Serie" />
         <div className="flex size-40 items-center justify-center rounded-2xl border bg-card text-7xl font-semibold">{current}</div>
       </Stage>
     );
 
   return (
     <Stage>
-      <Progress value={trial} total={WORKING_TRIALS.length} label="Serie" />
+      <Progress value={trial} total={WORKING_LENGTHS.length} label="Serie" />
       <form
         className="flex w-full max-w-sm flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
-          answers.current[trial] = answer;
-          if (trial + 1 === WORKING_TRIALS.length) onDone(answers.current);
+          answers.current[trial] = { sequence: sequence.current, answer };
+          if (trial + 1 === WORKING_LENGTHS.length) onDone(answers.current);
           else void present(trial + 1);
         }}
       >
@@ -238,13 +251,14 @@ export function Sensory({ number, total, onDone }: SectionProps<MemoryResponses[
   const [pulse, setPulse] = useState<Intensity | null>(null);
   const [given, setGiven] = useState<Intensity[]>([]);
   const answers = useRef<MemoryResponses["sensory"]>([]);
+  const [patterns] = useState(randomSensoryTrials);
 
   async function present(t: number) {
     setTrial(t);
     setGiven([]);
     setPhase("play");
     await sleep(900);
-    for (const intensity of SENSORY_TRIALS[t]) {
+    for (const intensity of patterns[t]) {
       playClap(intensity);
       setPulse(intensity);
       await sleep(250);
@@ -272,7 +286,7 @@ export function Sensory({ number, total, onDone }: SectionProps<MemoryResponses[
   if (phase === "play")
     return (
       <Stage>
-        <Progress value={trial} total={SENSORY_TRIALS.length} label="Ensayo" />
+        <Progress value={trial} total={patterns.length} label="Ensayo" />
         <p className="text-xl font-semibold">Escucha…</p>
         <div className={cn("size-24 rounded-full bg-lavender/40 transition-transform", pulse && "scale-110 bg-lavender")} />
       </Stage>
@@ -280,7 +294,7 @@ export function Sensory({ number, total, onDone }: SectionProps<MemoryResponses[
 
   return (
     <Stage>
-      <Progress value={trial} total={SENSORY_TRIALS.length} label="Ensayo" />
+      <Progress value={trial} total={patterns.length} label="Ensayo" />
       <h3 className="text-2xl font-semibold">¿En qué orden escuchaste los aplausos?</h3>
       <div className="flex gap-3">
         {[0, 1, 2].map((i) => (
@@ -305,8 +319,8 @@ export function Sensory({ number, total, onDone }: SectionProps<MemoryResponses[
           size="lg"
           disabled={!given.length}
           onClick={() => {
-            answers.current[trial] = [0, 1, 2].map((i) => given[i] ?? null);
-            if (trial + 1 === SENSORY_TRIALS.length) onDone(answers.current);
+            answers.current[trial] = { played: patterns[trial], given: [0, 1, 2].map((i) => given[i] ?? null) };
+            if (trial + 1 === patterns.length) onDone(answers.current);
             else void present(trial + 1);
           }}
         >
@@ -323,6 +337,7 @@ export function Semantic({ number, total, onDone }: SectionProps<MemoryResponses
   const [started, setStarted] = useState(false);
   const [item, setItem] = useState(0);
   const answers = useRef<(boolean | null)[]>([]);
+  const [order] = useState(() => shuffled(SEMANTIC_ITEMS.map((_, i) => i)));
 
   if (!started)
     return (
@@ -332,7 +347,7 @@ export function Semantic({ number, total, onDone }: SectionProps<MemoryResponses
         title="Memoria semántica"
         onStart={() => {
           setStarted(true);
-          speak(SEMANTIC_ITEMS[0].text);
+          speak(SEMANTIC_ITEMS[order[0]].text);
         }}
       >
         <p>Vas a leer y escuchar algunas afirmaciones. Indica si cada una es correcta o incorrecta.</p>
@@ -342,14 +357,14 @@ export function Semantic({ number, total, onDone }: SectionProps<MemoryResponses
   return (
     <Stage>
       <Progress value={item} total={SEMANTIC_ITEMS.length} label="Afirmación" />
-      <p className="text-3xl font-semibold">{SEMANTIC_ITEMS[item].text}</p>
+      <p className="text-3xl font-semibold">{SEMANTIC_ITEMS[order[item]].text}</p>
       <Choice
         options={["Correcto", "Incorrecto"]}
         onPick={(i) => {
-          answers.current[item] = i === 0;
+          answers.current[order[item]] = i === 0;
           if (item + 1 === SEMANTIC_ITEMS.length) return onDone(answers.current);
           setItem(item + 1);
-          speak(SEMANTIC_ITEMS[item + 1].text);
+          speak(SEMANTIC_ITEMS[order[item + 1]].text);
         }}
       />
     </Stage>
@@ -358,7 +373,6 @@ export function Semantic({ number, total, onDone }: SectionProps<MemoryResponses
 
 // 5. Episodic ---------------------------------------------------------------------
 
-type ActionKey = (typeof EPISODIC_ACTIONS)[number]["key"];
 const actionView = (key: ActionKey) => {
   const a = EPISODIC_ACTIONS.find((x) => x.key === key)!;
   return (
@@ -373,14 +387,16 @@ export function Episodic({ number, total, onDone }: SectionProps<MemoryResponses
   const sleep = useSleep();
   const [phase, setPhase] = useState<"intro" | "show" | "answer">("intro");
   const [current, setCurrent] = useState<number | null>(null);
-  const options = useMemo(() => shuffled(EPISODIC_ACTIONS.map((a) => a.key)), []);
+  const [shown] = useState(randomEpisodicActions);
+  const [options] = useState(() => shuffled(shown));
+  const action = (key: ActionKey) => EPISODIC_ACTIONS.find((a) => a.key === key)!;
 
   async function present() {
     setPhase("show");
     await sleep(700);
-    for (let i = 0; i < EPISODIC_ACTIONS.length; i++) {
+    for (let i = 0; i < shown.length; i++) {
       setCurrent(i);
-      speak(EPISODIC_ACTIONS[i].text);
+      speak(action(shown[i]).text);
       await sleep(EPISODIC_ITEM_MS);
       setCurrent(null);
       await sleep(300);
@@ -401,8 +417,8 @@ export function Episodic({ number, total, onDone }: SectionProps<MemoryResponses
         <div className="flex h-56 w-full max-w-md flex-col items-center justify-center gap-3 rounded-2xl border bg-card p-6 text-xl">
           {current !== null && (
             <>
-              <span className="text-7xl">{EPISODIC_ACTIONS[current].icon}</span>
-              {EPISODIC_ACTIONS[current].text}
+              <span className="text-7xl">{action(shown[current]).icon}</span>
+              {action(shown[current]).text}
             </>
           )}
         </div>
@@ -412,7 +428,12 @@ export function Episodic({ number, total, onDone }: SectionProps<MemoryResponses
   return (
     <Stage>
       <h3 className="text-2xl font-semibold">¿En qué orden ocurrieron las acciones?</h3>
-      <OrderPicker options={options} slots={3} render={actionView} onDone={onDone} />
+      <OrderPicker
+        options={options}
+        slots={shown.length}
+        render={actionView}
+        onDone={(given) => onDone({ shown, given })}
+      />
     </Stage>
   );
 }
@@ -551,10 +572,16 @@ export function Procedural({ number, total, onDone }: SectionProps<MemoryRespons
 
 // 7. Long-term (recall) -----------------------------------------------------------
 
-export function LongTermRecall({ number, total, onDone }: SectionProps<MemoryResponses["longTerm"]>) {
+export function LongTermRecall({
+  number,
+  total,
+  fact,
+  onDone,
+}: SectionProps<MemoryResponses["longTerm"]> & { fact: LongTermFact }) {
   const [started, setStarted] = useState(false);
   const [q, setQ] = useState(0);
-  const answers = useRef<(number | null)[]>([]);
+  const answers = useRef<(string | null)[]>([]);
+  const [questions] = useState(() => longTermQuestions(fact).map((x) => ({ ...x, options: longTermOptions(x) })));
 
   if (!started)
     return (
@@ -563,16 +590,17 @@ export function LongTermRecall({ number, total, onDone }: SectionProps<MemoryRes
       </SectionIntro>
     );
 
-  const question = LONG_TERM_QUESTIONS[q];
+  const question = questions[q];
   return (
     <Stage>
-      <Progress value={q} total={LONG_TERM_QUESTIONS.length} label="Pregunta" />
+      <Progress value={q} total={questions.length} label="Pregunta" />
       <h3 className="text-2xl font-semibold">{question.question}</h3>
       <Choice
+        key={q}
         options={question.options}
         onPick={(i) => {
-          answers.current[q] = i;
-          if (q + 1 === LONG_TERM_QUESTIONS.length) onDone(answers.current);
+          answers.current[q] = question.options[i];
+          if (q + 1 === questions.length) onDone({ fact, answers: answers.current });
           else setQ(q + 1);
         }}
       />

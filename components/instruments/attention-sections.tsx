@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ALTERNATING_COLORS,
   ALTERNATING_SHAPES,
-  ALTERNATING_STEPS,
+  randomAlternatingSteps,
+  randomSelectiveCounts,
   DIVIDED_WORD_MS,
   DIVIDED_WORDS,
   FOCALIZED_LIMIT_MS,
   FOCALIZED_STARS,
-  SELECTIVE_COUNTS,
   SELECTIVE_DISTRACTORS,
   SELECTIVE_GAP_MS,
   SELECTIVE_STIMULUS_MS,
@@ -44,13 +44,14 @@ export function Selective({ number, total, onDone }: SectionProps<AttentionRespo
   const [symbol, setSymbol] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState("");
-  const answers = useRef<(number | null)[]>([]);
+  const answers = useRef<AttentionResponses["selective"]>([]);
+  const [counts] = useState(randomSelectiveCounts);
 
   async function present(index: number) {
     setAsking(false);
     setSymbol(null);
     await sleep(800);
-    for (const s of selectiveSequence(SELECTIVE_COUNTS[index])) {
+    for (const s of selectiveSequence(counts[index])) {
       setSymbol(s);
       await sleep(SELECTIVE_STIMULUS_MS);
       setSymbol(null);
@@ -62,8 +63,8 @@ export function Selective({ number, total, onDone }: SectionProps<AttentionRespo
 
   function submit() {
     const n = answer.trim() === "" ? null : Number(answer);
-    answers.current[item] = Number.isFinite(n) ? n : null;
-    if (item + 1 === SELECTIVE_COUNTS.length) return onDone(answers.current);
+    answers.current[item] = { count: counts[item], answer: Number.isFinite(n) ? n : null };
+    if (item + 1 === counts.length) return onDone(answers.current);
     setItem(item + 1);
     void present(item + 1);
   }
@@ -83,13 +84,13 @@ export function Selective({ number, total, onDone }: SectionProps<AttentionRespo
           Verás figuras que aparecen una por una. Cuenta en silencio cuántas veces aparece la estrella rellena{" "}
           <span className="text-2xl">{SELECTIVE_TARGET}</span>.
         </p>
-        <p>No uses los dedos ni papel para contar. Son {SELECTIVE_COUNTS.length} series y cada una se muestra una sola vez.</p>
+        <p>No uses los dedos ni papel para contar. Son {counts.length} series y cada una se muestra una sola vez.</p>
       </SectionIntro>
     );
 
   return (
     <Stage>
-      <Progress value={item} total={SELECTIVE_COUNTS.length} label="Serie" />
+      <Progress value={item} total={counts.length} label="Serie" />
       {asking ? (
         <form
           className="flex w-full max-w-xs flex-col gap-4"
@@ -228,10 +229,9 @@ export function Sustained({ number, total, onDone }: SectionProps<AttentionRespo
   const [phase, setPhase] = useState<"intro" | "text" | "questions">("intro");
   const [q, setQ] = useState(0);
   const answers = useRef<(number | null)[]>([]);
-  const order = useMemo(
-    () => SUSTAINED_QUESTIONS.map((question) => shuffled(question.options.map((_, i) => i))),
-    [],
-  );
+  // Questions and their options appear in random order; answers are stored by original index.
+  const [questionOrder] = useState(() => shuffled(SUSTAINED_QUESTIONS.map((_, i) => i)));
+  const [order] = useState(() => SUSTAINED_QUESTIONS.map((question) => shuffled(question.options.map((_, i) => i))));
 
   if (phase === "intro")
     return (
@@ -264,15 +264,17 @@ export function Sustained({ number, total, onDone }: SectionProps<AttentionRespo
       </Stage>
     );
 
-  const question = SUSTAINED_QUESTIONS[q];
+  const qi = questionOrder[q];
+  const question = SUSTAINED_QUESTIONS[qi];
   return (
     <Stage>
       <Progress value={q} total={SUSTAINED_QUESTIONS.length} label="Pregunta" />
       <h3 className="text-2xl font-semibold">{question.question}</h3>
       <Choice
-        options={order[q].map((i) => question.options[i])}
+        key={q}
+        options={order[qi].map((i) => question.options[i])}
         onPick={(pos) => {
-          answers.current[q] = order[q][pos];
+          answers.current[qi] = order[qi][pos];
           if (q + 1 === SUSTAINED_QUESTIONS.length) onDone(answers.current);
           else setQ(q + 1);
         }}
@@ -375,27 +377,28 @@ export function Alternating({ number, total, onDone }: SectionProps<AttentionRes
   const [color, setColor] = useState<string | null>(null);
   const [shape, setShape] = useState<string | null>(null);
   const answers = useRef<AttentionResponses["alternating"]>([]);
+  const [steps] = useState(randomAlternatingSteps);
 
   function showInstruction(i: number) {
     setStep(i);
     setColor(null);
     setShape(null);
     setPhase("instruction");
-    speak(ALTERNATING_STEPS[i].text);
+    speak(steps[i].text);
   }
 
   if (phase === "intro")
     return (
       <SectionIntro number={number} total={total} title="Atención alternante" onStart={() => showInstruction(0)}>
-        <p>Recibirás 3 indicaciones, una por una. Cada una te pide un color y una figura. Léela, toca Continuar y elige el color y la figura que se pidió.</p>
+        <p>Recibirás {steps.length} indicaciones, una por una. Cada una te pide un color y una figura. Léela, toca Continuar y elige el color y la figura que se pidió.</p>
       </SectionIntro>
     );
 
   if (phase === "instruction")
     return (
       <Stage>
-        <Progress value={step} total={ALTERNATING_STEPS.length} label="Indicación" />
-        <p className="text-3xl font-semibold">{ALTERNATING_STEPS[step].text}</p>
+        <Progress value={step} total={steps.length} label="Indicación" />
+        <p className="text-3xl font-semibold">{steps[step].text}</p>
         <Button size="lg" onClick={() => setPhase("draw")}>
           Continuar
         </Button>
@@ -405,7 +408,7 @@ export function Alternating({ number, total, onDone }: SectionProps<AttentionRes
   const hex = ALTERNATING_COLORS.find((c) => c.key === color)?.hex ?? "#ffffff";
   return (
     <Stage>
-      <Progress value={step} total={ALTERNATING_STEPS.length} label="Indicación" />
+      <Progress value={step} total={steps.length} label="Indicación" />
       <div className="flex size-32 items-center justify-center rounded-2xl border bg-card">
         {shape ? <Shape shape={shape} color={hex} size={96} /> : <span className="text-muted-foreground">Tu dibujo</span>}
       </div>
@@ -445,8 +448,8 @@ export function Alternating({ number, total, onDone }: SectionProps<AttentionRes
         size="lg"
         disabled={!color || !shape}
         onClick={() => {
-          answers.current[step] = { color, shape };
-          if (step + 1 === ALTERNATING_STEPS.length) onDone(answers.current);
+          answers.current[step] = { expected: { color: steps[step].color, shape: steps[step].shape }, color, shape };
+          if (step + 1 === steps.length) onDone(answers.current);
           else showInstruction(step + 1);
         }}
       >
