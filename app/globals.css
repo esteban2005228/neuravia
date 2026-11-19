@@ -142,3 +142,29 @@
 .task-stage .fixation {
   font-size: 3rem;
 }
+
+/* Stronger aurora so the frosted glass card has color to blur. */
+.aurora-vivid {
+  background:
+    radial-gradient(45% 40% at 12% 18%, color-mix(in srgb, var(--cyan) 85%, transparent), transparent 70%),
+    radial-gradient(40% 45% at 88% 12%, color-mix(in srgb, var(--lavender) 90%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 75% 92%, color-mix(in srgb, var(--sand) 80%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 10% 88%, color-mix(in srgb, var(--blue) 80%, transparent), transparent 70%),
+    radial-gradient(35% 30% at 50% 50%, color-mix(in srgb, var(--lavender) 45%, transparent), transparent 75%),
+    var(--background);
+}
+
+/* Frosted glass card. Nested surfaces (inputs, option cards, checkboxes)
+   inherit translucent tokens so the whole card reads as glass. */
+.glass {
+  --card: rgb(255 255 255 / 0.35);
+  --border: rgb(255 255 255 / 0.7);
+  --input: rgb(255 255 255 / 0.85);
+  background: rgb(255 255 255 / 0.2);
+  border: 1px solid rgb(255 255 255 / 0.65);
+  box-shadow:
+    0 20px 50px -20px rgb(42 58 79 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.7);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}

@@ -78,7 +78,7 @@ export default async function HomePage() {
               <CardHeader>
                 <CardTitle>{subject.display_name}</CardTitle>
                 <CardDescription>
-                  {new Date().getFullYear() - subject.birth_year} años aprox. · {subject.education_years} años de estudio
+                  {new Date().getFullYear() - subject.birth_year} años aprox.
                   {subject.user_id === null && " · sin cuenta propia"}
                 </CardDescription>
               </CardHeader>

@@ -29,11 +29,11 @@ export type Database = {
           created_by: string | null;
           display_name: string;
           birth_year: number;
-          education_years: number;
+          education_years: number | null;
           created_at: string;
         };
         Insert: never;
-        Update: { display_name?: string; education_years?: number };
+        Update: { display_name?: string; education_years?: number | null };
         Relationships: [];
       };
       consents: {
@@ -182,7 +182,7 @@ export type Database = {
         Args: {
           p_display_name: string;
           p_birth_year: number;
-          p_education_years: number;
+          p_education_years: number | null;
           p_notice_version: string;
           p_research_consent?: boolean;
         };

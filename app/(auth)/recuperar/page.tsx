@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Recuperar contraseña" };
 
 export default function ResetPage() {
   return (
-    <Card>
+    <Card className="glass">
       <CardHeader>
         <CardTitle>Recuperar contraseña</CardTitle>
         <CardDescription>Te enviaremos un enlace para crear una nueva.</CardDescription>

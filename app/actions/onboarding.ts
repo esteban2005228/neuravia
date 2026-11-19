@@ -15,7 +15,6 @@ const patientFields = {
     .int()
     .min(currentYear - 45, "Neuravia está diseñada para personas de 18 a 45 años.")
     .max(currentYear - 18, "Neuravia está diseñada para personas de 18 a 45 años."),
-  educationYears: z.coerce.number().int().min(0).max(30, "Escribe los años de estudio, de 0 a 30."),
 };
 
 const base = z.object({
@@ -37,7 +36,6 @@ export async function completeOnboarding(_: FormState, formData: FormData): Prom
       })
       .safeParse({
         birthYear: formData.get("birthYear"),
-        educationYears: formData.get("educationYears"),
         serviceConsent: formData.get("serviceConsent"),
       });
     if (!patient.success) return { error: patient.error.issues[0].message };
@@ -46,7 +44,6 @@ export async function completeOnboarding(_: FormState, formData: FormData): Prom
       p_role: "patient",
       p_display_name: parsed.data.displayName,
       p_birth_year: patient.data.birthYear,
-      p_education_years: patient.data.educationYears,
       p_notice_version: NOTICE_VERSION,
       p_research_consent: formData.get("researchConsent") === "on",
     });
@@ -77,7 +74,6 @@ export async function createManagedSubject(_: FormState, formData: FormData): Pr
     .safeParse({
       displayName: formData.get("displayName"),
       birthYear: formData.get("birthYear"),
-      educationYears: formData.get("educationYears"),
       serviceConsent: formData.get("serviceConsent"),
       patientPresent: formData.get("patientPresent"),
     });
@@ -87,7 +83,7 @@ export async function createManagedSubject(_: FormState, formData: FormData): Pr
   const { data: subjectId, error } = await supabase.rpc("create_managed_subject", {
     p_display_name: parsed.data.displayName,
     p_birth_year: parsed.data.birthYear,
-    p_education_years: parsed.data.educationYears,
+    p_education_years: null,
     p_notice_version: NOTICE_VERSION,
     p_research_consent: formData.get("researchConsent") === "on",
   });

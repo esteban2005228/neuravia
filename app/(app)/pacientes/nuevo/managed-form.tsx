@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { createManagedSubject } from "@/app/actions/onboarding";
 import { ConsentFields } from "@/components/consent/consent-fields";
-import { PatientFields } from "@/components/consent/patient-fields";
+import { BirthYearField } from "@/components/consent/patient-fields";
 import { FormMessage, SubmitButton } from "@/components/form-bits";
 import { CheckboxField } from "@/components/ui/checkbox-field";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ export function ManagedSubjectForm() {
         <Label htmlFor="displayName">Nombre del paciente</Label>
         <Input id="displayName" name="displayName" maxLength={80} required />
       </div>
-      <PatientFields />
+      <BirthYearField />
       <div className="space-y-3 rounded-xl border border-amber/60 bg-amber/10 p-4">
         <p className="text-sm font-semibold">Entrega el dispositivo al paciente para esta parte.</p>
         <ConsentFields thirdPerson />

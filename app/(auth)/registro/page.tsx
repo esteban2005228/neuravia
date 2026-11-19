@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Crear cuenta" };
 
 export default function RegisterPage() {
   return (
-    <Card>
+    <Card className="glass">
       <CardHeader>
         <CardTitle>Crear cuenta</CardTitle>
         <CardDescription>Después elegirás si eres paciente, profesional o acompañante.</CardDescription>
