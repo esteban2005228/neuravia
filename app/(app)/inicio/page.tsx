@@ -16,7 +16,7 @@ export default async function HomePage() {
     const subject = await getOwnSubject();
     return (
       <div className="space-y-8">
-        <section className="aurora rounded-2xl border p-6 sm:p-8">
+        <section className="glass rounded-2xl p-6 sm:p-8">
           <h1 className="text-2xl font-semibold sm:text-3xl">Hola, {profile.display_name}</h1>
           <p className="mt-2 max-w-xl text-muted-foreground">
             Cada prueba dura de 3 a 5 minutos. Busca un lugar tranquilo y sin distracciones.

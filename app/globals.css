@@ -154,6 +154,11 @@
     var(--background);
 }
 
+/* Keeps the aurora still behind scrolling content inside the app. */
+.aurora-fixed {
+  background-attachment: fixed;
+}
+
 /* Frosted glass card. Nested surfaces (inputs, option cards, checkboxes)
    inherit translucent tokens so the whole card reads as glass. */
 .glass {

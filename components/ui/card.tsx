@@ -2,11 +2,12 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/** Every card uses the frosted-glass look from the login screen (see .glass in globals.css). */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
-      className={cn("rounded-xl border bg-card text-card-foreground shadow-sm", className)}
+      className={cn("glass rounded-2xl text-card-foreground", className)}
       {...props}
     />
   );
