@@ -13,9 +13,10 @@ import {
   PROCEDURAL_GRID,
   PROCEDURAL_LENGTH,
   PROCEDURAL_MAX_MS,
+  PROCEDURAL_ATTEMPTS,
   PROCEDURAL_ROUNDS,
   PROCEDURAL_SHOW_MS,
-  PROCEDURAL_TRIALS_PER_ROUND,
+  proceduralTrialOk,
   SEMANTIC_ITEMS,
   SENSORY_TRIALS,
   SHORT_TERM_ITEM_MS,
@@ -25,6 +26,7 @@ import {
   type Intensity,
   type MemoryResponses,
   type ObjectKey,
+  type ProceduralTrial,
 } from "@/lib/instruments/memory";
 import { cn } from "@/lib/utils";
 import {
@@ -417,43 +419,64 @@ export function Episodic({ number, total, onDone }: SectionProps<MemoryResponses
 
 // 6. Procedural -------------------------------------------------------------------
 
-/** One random sequence of distinct cells, reused in every trial (that repetition is what gets learned). */
+/** Five distinct random cells; index i holds the cell where number i + 1 appears. */
 function proceduralSequence() {
   return shuffled(Array.from({ length: PROCEDURAL_GRID }, (_, i) => i)).slice(0, PROCEDURAL_LENGTH);
 }
 
-type ProceduralTrial = MemoryResponses["procedural"][number];
-
 export function Procedural({ number, total, onDone }: SectionProps<MemoryResponses["procedural"]>) {
   const sleep = useSleep();
-  const [sequence] = useState(proceduralSequence);
-  const [phase, setPhase] = useState<"intro" | "show" | "answer" | "pause">("intro");
-  const [trial, setTrial] = useState(0);
+  const [phase, setPhase] = useState<"intro" | "show" | "answer" | "pause" | "feedback">("intro");
+  const [round, setRound] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+  const [sequence, setSequence] = useState<number[]>([]);
   const [taps, setTaps] = useState<number[]>([]);
+  const [lastOk, setLastOk] = useState(false);
   const results = useRef<ProceduralTrial[]>([]);
-  const answer = useRef<{ start: number; taps: number[]; timer: ReturnType<typeof setTimeout> } | null>(null);
-  const trials = PROCEDURAL_ROUNDS * PROCEDURAL_TRIALS_PER_ROUND;
-  const round = Math.floor(trial / PROCEDURAL_TRIALS_PER_ROUND);
+  const answer = useRef<{
+    round: number;
+    sequence: number[];
+    start: number;
+    taps: number[];
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
 
-  async function present(t: number) {
-    setTrial(t);
+  async function present(nextRound: number, nextAttempt: number) {
+    const seq = proceduralSequence();
+    setRound(nextRound);
+    setAttempt(nextAttempt);
+    setSequence(seq);
     setTaps([]);
     setPhase("pause");
-    await sleep(t % PROCEDURAL_TRIALS_PER_ROUND === 0 ? 1500 : 800);
+    await sleep(nextAttempt === 0 ? 1500 : 900);
     setPhase("show");
-    await sleep(PROCEDURAL_SHOW_MS[Math.floor(t / PROCEDURAL_TRIALS_PER_ROUND)]);
+    await sleep(PROCEDURAL_SHOW_MS[nextRound]);
     setPhase("answer");
-    answer.current = { start: now(), taps: [], timer: setTimeout(() => finishTrial(t, null), PROCEDURAL_MAX_MS) };
+    answer.current = {
+      round: nextRound,
+      sequence: seq,
+      start: now(),
+      taps: [],
+      timer: setTimeout(() => void finishTrial(null), PROCEDURAL_MAX_MS),
+    };
   }
 
-  function finishTrial(t: number, rt: number | null) {
+  async function finishTrial(rt: number | null) {
     const a = answer.current;
     if (!a) return;
     clearTimeout(a.timer);
     answer.current = null;
-    results.current.push({ positions: [...sequence], taps: a.taps, rt });
-    if (t + 1 === trials) onDone(results.current);
-    else void present(t + 1);
+    const trial: ProceduralTrial = { round: a.round, positions: a.sequence, taps: a.taps, rt };
+    results.current.push(trial);
+    const ok = proceduralTrialOk(trial);
+    const tries = results.current.filter((t) => t.round === a.round).length;
+    setLastOk(ok);
+    setPhase("feedback");
+    await sleep(1200);
+    if (ok || tries === PROCEDURAL_ATTEMPTS) {
+      if (a.round + 1 === PROCEDURAL_ROUNDS) onDone(results.current);
+      else void present(a.round + 1, 0);
+    } else void present(a.round, tries);
   }
 
   function tap(cell: number) {
@@ -461,32 +484,40 @@ export function Procedural({ number, total, onDone }: SectionProps<MemoryRespons
     if (!a || a.taps.includes(cell)) return;
     a.taps = [...a.taps, cell];
     setTaps(a.taps);
-    if (a.taps.length === PROCEDURAL_LENGTH) finishTrial(trial, Math.round(now() - a.start));
+    if (a.taps.length === PROCEDURAL_LENGTH) void finishTrial(Math.round(now() - a.start));
   }
 
   if (phase === "intro")
     return (
-      <SectionIntro number={number} total={total} title="Memoria procedimental" onStart={() => void present(0)}>
+      <SectionIntro number={number} total={total} title="Memoria procedimental" onStart={() => void present(0, 0)}>
         <p>
           En una cuadrícula van a aparecer los números del 1 al {PROCEDURAL_LENGTH}. Fíjate dónde está cada uno: después
           se borran.
         </p>
         <p>Cuando se borren, toca las casillas en orden: primero donde estaba el 1, luego el 2, y así hasta el {PROCEDURAL_LENGTH}.</p>
         <p>
-          Son {PROCEDURAL_ROUNDS} rondas de {PROCEDURAL_TRIALS_PER_ROUND} intentos. En cada ronda los números se ven menos
-          tiempo. Responde lo más rápido que puedas sin equivocarte.
+          Son {PROCEDURAL_ROUNDS} rondas y en cada una los números se ven menos tiempo. Si aciertas, pasas a la
+          siguiente ronda; si te equivocas, tienes hasta {PROCEDURAL_ATTEMPTS} intentos. Responde lo más rápido que
+          puedas sin equivocarte.
         </p>
       </SectionIntro>
     );
 
   const label =
-    phase === "show" ? "Memoriza el orden" : phase === "answer" ? "Toca las casillas en orden" : "Prepárate…";
+    phase === "show"
+      ? "Memoriza el orden"
+      : phase === "answer"
+        ? "Toca las casillas en orden"
+        : phase === "feedback"
+          ? lastOk
+            ? "¡Bien hecho!"
+            : "Vamos a intentarlo de nuevo"
+          : "Prepárate…";
 
   return (
     <Stage>
       <p className="text-sm text-muted-foreground">
-        Ronda {round + 1} de {PROCEDURAL_ROUNDS} · Intento {(trial % PROCEDURAL_TRIALS_PER_ROUND) + 1} de{" "}
-        {PROCEDURAL_TRIALS_PER_ROUND}
+        Ronda {round + 1} de {PROCEDURAL_ROUNDS} · Intento {attempt + 1} de {PROCEDURAL_ATTEMPTS}
       </p>
       <h3 className="text-2xl font-semibold" aria-live="polite">
         {label}

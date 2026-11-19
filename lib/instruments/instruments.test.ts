@@ -13,7 +13,6 @@ import {
   EPISODIC_ACTIONS,
   LONG_TERM_QUESTIONS,
   PROCEDURAL_ROUNDS,
-  PROCEDURAL_TRIALS_PER_ROUND,
   SEMANTIC_ITEMS,
   SENSORY_TRIALS,
   SHORT_TERM_TRIALS,
@@ -50,6 +49,8 @@ describe("scoreAttention", () => {
 });
 
 const SEQUENCE = [4, 0, 7, 2, 5];
+const hit = (round: number, rt: number) => ({ round, positions: [...SEQUENCE], taps: [...SEQUENCE], rt });
+const miss = (round: number) => ({ round, positions: [...SEQUENCE], taps: [4, 0, 2, 7, 5], rt: 3000 });
 
 const perfectMemory = (): MemoryResponses => ({
   shortTerm: [SHORT_TERM_TRIALS[0]],
@@ -57,11 +58,7 @@ const perfectMemory = (): MemoryResponses => ({
   sensory: SENSORY_TRIALS.map((t) => [...t]),
   semantic: SEMANTIC_ITEMS.map((s) => s.answer),
   episodic: EPISODIC_ACTIONS.map((a) => a.key),
-  procedural: Array.from({ length: PROCEDURAL_ROUNDS * PROCEDURAL_TRIALS_PER_ROUND }, (_, t) => ({
-    positions: [...SEQUENCE],
-    taps: [...SEQUENCE],
-    rt: 4000 - t * 200,
-  })),
+  procedural: Array.from({ length: PROCEDURAL_ROUNDS }, (_, round) => hit(round, 4000 - round * 500)),
   longTerm: LONG_TERM_QUESTIONS.map((q) => q.answer),
 });
 
@@ -76,18 +73,21 @@ describe("scoreMemory", () => {
     const r = perfectMemory();
     r.shortTerm = [["reloj", "lapiz", "cuchara", "llave"], ["cuchara", "lapiz", "llave", null]];
     r.working[0] = "13 ab";
-    r.procedural[8].rt = 5000; // over the round-3 limit
-    r.procedural[1].taps = [4, 0, 2, 7, 5]; // wrong order
+    // Round 1 on the second try, round 2 never (third try too slow), round 3 first try.
+    r.procedural = [miss(0), hit(0, 3800), miss(1), miss(1), hit(1, 6000), hit(2, 2700)];
     const result = scoreMemory(r);
     const subs = Object.fromEntries(result.metrics.subscales.map((s) => [s.key, s.score]));
-    expect(subs).toMatchObject({ short_term: 3, working: 13, procedural: 7 });
-    expect(result.metrics.procedural_round_ms).toEqual([3800, 3200, 2700]);
+    expect(subs).toMatchObject({ short_term: 3, working: 13, procedural: 5 });
+    expect(result.metrics.procedural_round_ms).toEqual([3800, null, 2700]);
+    expect(result.metrics.procedural_attempts).toEqual([2, 3, 1]);
     expect(result.metrics.procedural_gain_pct).toBe(29);
   });
 
-  it("rejects a procedural sequence that changes between trials", () => {
+  it("rejects procedural trials that break the retry flow", () => {
     const r = perfectMemory();
-    r.procedural[3].positions = [0, 1, 2, 3, 4];
+    r.procedural = [hit(0, 3000), hit(0, 3000), hit(1, 3000), hit(2, 3000)]; // repeated a solved round
+    expect(() => scoreMemory(r)).toThrow();
+    r.procedural = [miss(0), hit(1, 3000), hit(2, 3000)]; // skipped a retry
     expect(() => scoreMemory(r)).toThrow();
   });
 });

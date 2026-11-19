@@ -8,7 +8,7 @@ import type { Subscale } from "./types";
  * Shared by the client (presentation) and the server (scoring from raw responses).
  */
 export const MEMORY_CODE = "MEM_instrument" as const;
-export const MEMORY_VERSION = "1.1";
+export const MEMORY_VERSION = "1.2";
 
 // 7. Long-term: shown at the very start, asked at the very end.
 export const LONG_TERM_TEXT = "Laura tiene 32 años, vive en Puebla y tiene un perro llamado Max.";
@@ -65,23 +65,51 @@ export const EPISODIC_ACTIONS = [
 ] as const;
 export const EPISODIC_ITEM_MS = 2500;
 
-// 6. Procedural: serial reaction time task. Numbers 1–5 flash on a 3x3 grid, then hide; the person taps
-// the cells in order. The same sequence repeats in every trial, so practice shows as faster, error-free runs.
-// Each round shows the numbers for less time and allows less time to answer.
+// 6. Procedural: serial reaction time task. Numbers 1–5 flash on a 3x3 grid in random cells, then hide;
+// the person taps the cells in order. Each of the 3 rounds shows the numbers for less time and allows less
+// time to answer. A correct, in-time answer moves on to the next round; a miss is retried with a new
+// arrangement, up to 3 attempts per round. Learning the procedure shows as faster, first-try answers.
 export const PROCEDURAL_GRID = 9;
 export const PROCEDURAL_LENGTH = 5;
 export const PROCEDURAL_ROUNDS = 3;
-export const PROCEDURAL_TRIALS_PER_ROUND = 3;
+export const PROCEDURAL_ATTEMPTS = 3;
 export const PROCEDURAL_SHOW_MS = [3000, 2000, 1500];
 export const PROCEDURAL_LIMIT_MS = [7000, 5500, 4500];
 export const PROCEDURAL_MAX_MS = 15_000;
 
 const cell = z.number().int().min(0).max(PROCEDURAL_GRID - 1);
 const proceduralTrial = z.object({
-  positions: z.array(cell).length(PROCEDURAL_LENGTH),
+  round: z.number().int().min(0).max(PROCEDURAL_ROUNDS - 1),
+  positions: z
+    .array(cell)
+    .length(PROCEDURAL_LENGTH)
+    .refine((p) => new Set(p).size === PROCEDURAL_LENGTH, "Cells must be distinct"),
   taps: z.array(cell).max(PROCEDURAL_LENGTH),
   rt: z.number().nonnegative().max(PROCEDURAL_MAX_MS).nullable(),
 });
+export type ProceduralTrial = z.infer<typeof proceduralTrial>;
+
+/** Right cells, right order, within the round's time limit. Used by the client to decide a retry. */
+export const proceduralTrialOk = (t: ProceduralTrial) =>
+  t.taps.length === PROCEDURAL_LENGTH &&
+  t.taps.every((c, i) => c === t.positions[i]) &&
+  t.rt !== null &&
+  t.rt <= PROCEDURAL_LIMIT_MS[t.round];
+
+/** Checks the trials follow the flow: next round after a hit or after the last attempt, never otherwise. */
+function proceduralFlowValid(trials: ProceduralTrial[]) {
+  let round = 0;
+  let attempt = 0;
+  for (const t of trials) {
+    if (round >= PROCEDURAL_ROUNDS || t.round !== round) return false;
+    attempt++;
+    if (proceduralTrialOk(t) || attempt === PROCEDURAL_ATTEMPTS) {
+      round++;
+      attempt = 0;
+    }
+  }
+  return round === PROCEDURAL_ROUNDS;
+}
 
 const orderList = <T extends z.ZodTypeAny>(item: T, max: number) => z.array(item.nullable()).max(max);
 
@@ -93,13 +121,9 @@ export const memoryResponsesSchema = z.object({
   episodic: orderList(z.enum(["take", "move", "palms"]), 3),
   procedural: z
     .array(proceduralTrial)
-    .length(PROCEDURAL_ROUNDS * PROCEDURAL_TRIALS_PER_ROUND)
-    .refine(
-      (trials) =>
-        new Set(trials[0].positions).size === PROCEDURAL_LENGTH &&
-        trials.every((t) => t.positions.every((p, i) => p === trials[0].positions[i])),
-      "The procedural sequence must have distinct cells and repeat in every trial",
-    ),
+    .min(PROCEDURAL_ROUNDS)
+    .max(PROCEDURAL_ROUNDS * PROCEDURAL_ATTEMPTS)
+    .refine(proceduralFlowValid, "Procedural trials do not follow the round/attempt flow"),
   longTerm: z.array(z.number().int().min(0).max(3).nullable()).length(LONG_TERM_QUESTIONS.length),
 });
 export type MemoryResponses = z.infer<typeof memoryResponsesSchema>;
@@ -124,22 +148,19 @@ export function scoreMemory(raw: unknown) {
   const sensory = r.sensory.reduce((n, given, i) => n + positionsCorrect(given, SENSORY_TRIALS[i]), 0);
   const semantic = r.semantic.filter((a, i) => a === SEMANTIC_ITEMS[i].answer).length;
   const episodic = positionsCorrect(r.episodic, EPISODIC_ACTIONS.map((a) => a.key));
-  const proceduralRound = (t: number) => Math.floor(t / PROCEDURAL_TRIALS_PER_ROUND);
-  const proceduralOk = r.procedural.map(
-    (trial, t) =>
-      trial.taps.length === PROCEDURAL_LENGTH &&
-      trial.taps.every((c, i) => c === trial.positions[i]) &&
-      trial.rt !== null &&
-      trial.rt <= PROCEDURAL_LIMIT_MS[proceduralRound(t)],
-  );
-  const procedural = proceduralOk.filter(Boolean).length;
-  // Mean completion time of the correct trials in each round; a drop from round 1 to 3 shows learning.
-  const proceduralRoundMs = Array.from({ length: PROCEDURAL_ROUNDS }, (_, round) => {
-    const times = r.procedural
-      .filter((trial, t) => proceduralRound(t) === round && proceduralOk[t])
-      .map((trial) => trial.rt!);
-    return times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null;
+  // Per round: 3 points on the first attempt, 2 on the second, 1 on the third, 0 if never solved.
+  const proceduralRounds = Array.from({ length: PROCEDURAL_ROUNDS }, (_, round) => {
+    const attempts = r.procedural.filter((t) => t.round === round);
+    const hit = attempts.findIndex(proceduralTrialOk);
+    return {
+      points: hit < 0 ? 0 : PROCEDURAL_ATTEMPTS - hit,
+      attempts: attempts.length,
+      ms: hit < 0 ? null : Math.round(attempts[hit].rt!),
+    };
   });
+  const procedural = proceduralRounds.reduce((n, x) => n + x.points, 0);
+  // Time of the solved attempt in each round; a drop from round 1 to 3 shows learning.
+  const proceduralRoundMs = proceduralRounds.map((x) => x.ms);
   const [firstMs, , lastMs] = proceduralRoundMs;
   const proceduralGainPct =
     firstMs && lastMs !== null ? Math.round(((firstMs - lastMs) / firstMs) * 100) : null;
@@ -151,7 +172,7 @@ export function scoreMemory(raw: unknown) {
     { key: "sensory", label: "Memoria sensorial", score: sensory, max: SENSORY_TRIALS.length * 3 },
     { key: "semantic", label: "Memoria semántica", score: semantic, max: SEMANTIC_ITEMS.length },
     { key: "episodic", label: "Memoria episódica", score: episodic, max: EPISODIC_ACTIONS.length },
-    { key: "procedural", label: "Memoria procedimental", score: procedural, max: PROCEDURAL_ROUNDS * PROCEDURAL_TRIALS_PER_ROUND },
+    { key: "procedural", label: "Memoria procedimental", score: procedural, max: PROCEDURAL_ROUNDS * PROCEDURAL_ATTEMPTS },
     { key: "long_term", label: "Memoria a largo plazo", score: longTerm, max: LONG_TERM_QUESTIONS.length },
   ];
   const rawScore = subscales.reduce((s, x) => s + x.score, 0);
@@ -165,6 +186,7 @@ export function scoreMemory(raw: unknown) {
       max_score: max,
       short_term_trials: r.shortTerm.length,
       procedural_round_ms: proceduralRoundMs,
+      procedural_attempts: proceduralRounds.map((x) => x.attempts),
       procedural_gain_pct: proceduralGainPct,
     },
     rawScore,

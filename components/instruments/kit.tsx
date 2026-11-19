@@ -31,14 +31,44 @@ export function useSleep() {
 // Audio: speech for spoken instructions, short synthesized sounds for stimuli.
 // ---------------------------------------------------------------------------
 
+/**
+ * Ranks the device's Spanish voices so the most natural one wins: neural/online/premium voices first
+ * (Edge "Natural", Chrome "Google", Apple "Premium/Enhanced/Siri"), Latin American accents before Spain,
+ * and robotic engines (eSpeak, "Compact") last.
+ */
+function voiceScore(v: SpeechSynthesisVoice) {
+  const name = v.name.toLowerCase();
+  const lang = v.lang.toLowerCase().replace("_", "-");
+  let score = 0;
+  if (/natural|neural|online|premium|enhanced|mejorad|siri/.test(name)) score += 50;
+  if (/google/.test(name)) score += 30;
+  if (/paulina|m[oó]nica|dalia|sabina|jorge|juan|camila|helena/.test(name)) score += 10;
+  if (!v.localService) score += 5;
+  if (lang === "es-mx") score += 20;
+  else if (lang === "es-us" || lang === "es-419") score += 15;
+  else if (lang !== "es-es") score += 8;
+  if (/espeak|compact|eloquence/.test(name)) score -= 60;
+  return score;
+}
+
+let bestVoice: SpeechSynthesisVoice | null | undefined;
+function pickVoice() {
+  if (bestVoice) return bestVoice;
+  const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith("es"));
+  if (!voices.length) return null; // voices still loading; the next call tries again
+  bestVoice = voices.sort((a, b) => voiceScore(b) - voiceScore(a))[0];
+  return bestVoice;
+}
+
 export function speak(text: string) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = "es-MX";
-  u.rate = 0.95;
-  const voice = window.speechSynthesis.getVoices().find((v) => v.lang.startsWith("es"));
+  const voice = pickVoice();
+  u.lang = voice?.lang ?? "es-MX";
   if (voice) u.voice = voice;
+  u.rate = 0.92;
+  u.pitch = 1;
   window.speechSynthesis.speak(u);
 }
 
@@ -76,7 +106,10 @@ export function playClap(intensity: "soft" | "loud") {
 /** Unlocks audio on iOS/Safari; call from a click. */
 export function primeAudio() {
   audio();
-  if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.getVoices();
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", () => (bestVoice = undefined), { once: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
