@@ -30,13 +30,14 @@ export default async function LinkPage() {
   return (
     <Card className="max-w-xl">
       <CardHeader>
-        <CardTitle>Canjear código de un paciente</CardTitle>
+        <CardTitle>{profile.role === "professional" ? "Vincular paciente" : "Vincular familiar"}</CardTitle>
         <CardDescription>
-          El paciente genera el código desde su cuenta, en la sección Vincular. El código vale 24 horas.
+          {profile.role === "professional" ? "El paciente" : "Tu familiar"} genera un código desde su cuenta, en la
+          sección Vincular. Escríbelo aquí; vale 24 horas.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <RedeemForm />
+        <RedeemForm role={profile.role} />
       </CardContent>
     </Card>
   );

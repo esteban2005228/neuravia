@@ -41,3 +41,22 @@ export async function deleteAccount(_: FormState, formData: FormData): Promise<F
   await supabase.auth.signOut();
   redirect("/?cuenta=borrada");
 }
+
+/** Edits the account name. A patient's own subject keeps the same name. */
+export async function updateAccount(_: FormState, formData: FormData): Promise<FormState> {
+  const name = z.string().trim().min(1, "Escribe tu nombre.").max(80).safeParse(formData.get("displayName"));
+  if (!name.success) return { error: name.error.issues[0].message };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Tu sesión expiró. Vuelve a entrar." };
+
+  const { error } = await supabase.from("profiles").update({ display_name: name.data }).eq("id", user.id);
+  if (error) return { error: friendlyError(error.message) };
+  await supabase.from("subjects").update({ display_name: name.data }).eq("user_id", user.id);
+
+  revalidatePath("/", "layout");
+  return { ok: "Datos guardados." };
+}

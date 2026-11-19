@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireProfile, type Subject } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { AccountForm } from "./account-form";
 import { DeleteAccountForm } from "./delete-account-form";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
@@ -83,7 +84,8 @@ export default async function AccountPage() {
             {profile.display_name} · {ROLE_LABEL[profile.role]} · {user.email}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
+          <AccountForm key={profile.display_name} displayName={profile.display_name} />
           <Button asChild variant="outline" size="sm">
             <Link href="/cuenta/contrasena">Cambiar contraseña</Link>
           </Button>
@@ -125,7 +127,9 @@ export default async function AccountPage() {
           <CardDescription>
             {profile.role === "patient"
               ? "Personas que pueden aplicarte pruebas y ver tus resultados."
-              : "Pacientes a los que puedes aplicar pruebas."}
+              : profile.role === "professional"
+                ? "Pacientes a los que puedes aplicar pruebas."
+                : "Familiares a los que acompañas."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -167,7 +171,7 @@ export default async function AccountPage() {
           <CardTitle>Borrar mi cuenta</CardTitle>
           <CardDescription>
             Se borran tu cuenta, tus resultados y tus vínculos de forma permanente.
-            {(managed?.length ?? 0) > 0 && " También los pacientes que registraste sin correo y sus resultados."}
+            {(managed?.length ?? 0) > 0 && " También los familiares que registraste sin correo y sus resultados."}
           </CardDescription>
         </CardHeader>
         <CardContent>

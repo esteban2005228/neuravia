@@ -15,7 +15,7 @@ export function ManagedSubjectForm() {
   return (
     <form action={action} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="displayName">Nombre del paciente</Label>
+        <Label htmlFor="displayName">Nombre de tu familiar</Label>
         <Input id="displayName" name="displayName" maxLength={80} required />
       </div>
       <BirthYearField />
@@ -28,7 +28,7 @@ export function ManagedSubjectForm() {
         anteriores.
       </CheckboxField>
       <FormMessage state={state} />
-      <SubmitButton className="w-full">Registrar paciente</SubmitButton>
+      <SubmitButton className="w-full">Registrar familiar</SubmitButton>
     </form>
   );
 }

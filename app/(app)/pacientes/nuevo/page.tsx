@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { requireProfile } from "@/lib/auth";
 import { ManagedSubjectForm } from "./managed-form";
 
-export const metadata: Metadata = { title: "Registrar paciente" };
+export const metadata: Metadata = { title: "Registrar familiar" };
 
 export default async function NewManagedSubjectPage() {
   const { profile } = await requireProfile();
@@ -14,9 +14,9 @@ export default async function NewManagedSubjectPage() {
   return (
     <Card className="mx-auto max-w-2xl">
       <CardHeader>
-        <CardTitle>Registrar a un paciente sin correo</CardTitle>
+        <CardTitle>Registrar a un familiar sin correo</CardTitle>
         <CardDescription>
-          Para personas que no usan correo o computadora. El paciente debe estar contigo y aceptar el aviso de privacidad
+          Para personas que no usan correo o computadora. Tu familiar debe estar contigo y aceptar el aviso de privacidad
           en este dispositivo: el consentimiento es suyo, no tuyo.
         </CardDescription>
       </CardHeader>

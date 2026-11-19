@@ -27,6 +27,12 @@ export default async function HomePage() {
               </Button>
             )}
             <Button asChild size="lg" variant="outline">
+              <Link href="/juegos">Minijuegos</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/consejos">Consejos</Link>
+            </Button>
+            <Button asChild size="lg" variant="ghost">
               <Link href="/vincular">Vincular a mi doctor o familiar</Link>
             </Button>
           </div>
@@ -51,11 +57,11 @@ export default async function HomePage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Button asChild>
-            <Link href="/vincular">Canjear código</Link>
+            <Link href="/vincular">{profile.role === "professional" ? "Vincular paciente" : "Vincular familiar"}</Link>
           </Button>
           {profile.role === "companion" && (
             <Button asChild variant="outline">
-              <Link href="/pacientes/nuevo">Registrar paciente sin correo</Link>
+              <Link href="/pacientes/nuevo">Registrar familiar sin correo</Link>
             </Button>
           )}
         </div>
@@ -64,9 +70,12 @@ export default async function HomePage() {
       {subjects.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Aún no tienes pacientes vinculados</CardTitle>
+            <CardTitle>
+              {profile.role === "professional" ? "Aún no tienes pacientes vinculados" : "Aún no tienes familiares vinculados"}
+            </CardTitle>
             <CardDescription>
-              Pide al paciente que genere un código en su cuenta (Vincular) y escríbelo aquí.
+              Pide {profile.role === "professional" ? "al paciente" : "a tu familiar"} que genere un código en su cuenta
+              (Vincular) y escríbelo aquí.
               {profile.role === "companion" && " Si la persona no tiene correo, puedes registrarla tú en su presencia."}
             </CardDescription>
           </CardHeader>
@@ -83,9 +92,16 @@ export default async function HomePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button asChild variant="secondary">
-                  <Link href={`/evaluar/${subject.id}`}>Ver resultados y aplicar prueba</Link>
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild variant="secondary">
+                    <Link href={`/evaluar/${subject.id}`}>Ver resultados y aplicar prueba</Link>
+                  </Button>
+                  {profile.role === "companion" && (
+                    <Button asChild variant="outline">
+                      <Link href="/consejos">Ver consejos</Link>
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

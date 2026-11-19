@@ -7,12 +7,12 @@ import { FormMessage, SubmitButton } from "@/components/form-bits";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function RedeemForm() {
+export function RedeemForm({ role }: { role: "patient" | "professional" | "companion" }) {
   const [state, action] = useActionState(redeemLinkCode, undefined);
   return (
     <form action={action} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="code">Código del paciente</Label>
+        <Label htmlFor="code">{role === "professional" ? "Código del paciente" : "Código de tu familiar"}</Label>
         <Input
           id="code"
           name="code"
@@ -24,7 +24,7 @@ export function RedeemForm() {
         />
       </div>
       <FormMessage state={state} />
-      <SubmitButton>Vincular</SubmitButton>
+      <SubmitButton>{role === "professional" ? "Vincular paciente" : "Vincular familiar"}</SubmitButton>
     </form>
   );
 }
