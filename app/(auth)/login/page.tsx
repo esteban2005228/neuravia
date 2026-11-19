@@ -16,7 +16,7 @@ const LINK_ERRORS: Record<string, string> = {
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const { next, error } = await searchParams;
   return (
-    <Card className="glass">
+    <Card>
       <CardHeader>
         <CardTitle>Entrar</CardTitle>
       </CardHeader>

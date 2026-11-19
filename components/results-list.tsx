@@ -20,7 +20,7 @@ export async function ResultsList({ subjectId, limit = 10 }: { subjectId: string
   }
 
   return (
-    <ul className="divide-y rounded-xl border bg-card">
+    <ul className="glass divide-y divide-white/60 rounded-2xl">
       {runs.map((run) => {
         const level = LEVEL_LABELS[run.level];
         return (

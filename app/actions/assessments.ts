@@ -37,6 +37,9 @@ export async function submitTaskRun(input: {
   }
 
   const supabase = await createClient();
+  const { data: task } = await supabase.from("tasks").select("active").eq("code", input.taskCode).maybeSingle();
+  if (!task?.active) return { error: "Esta prueba ya no está disponible." };
+
   const { data, error } = await supabase
     .from("task_runs")
     .insert({
