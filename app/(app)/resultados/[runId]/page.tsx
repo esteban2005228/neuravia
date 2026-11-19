@@ -77,6 +77,11 @@ export default async function ResultPage({ params }: { params: Promise<{ runId: 
               <Button asChild variant="secondary">
                 <Link href={`/evaluar/${run.assessments.subject_id}`}>Volver a las pruebas</Link>
               </Button>
+              <Button asChild variant="secondary">
+                <Link href={`/historial/${run.assessments.subject_id}/${run.task_code}?run=${run.id}#run-${run.id}`}>
+                  Ver historial de respuestas
+                </Link>
+              </Button>
               <Button asChild variant="outline">
                 <Link href="/juegos">Practicar con minijuegos</Link>
               </Button>
@@ -115,9 +120,16 @@ export default async function ResultPage({ params }: { params: Promise<{ runId: 
             Este resultado es orientativo y no es un diagnóstico. Los niveles son provisionales mientras reunimos datos de
             referencia por edad y escolaridad. Cansancio, sueño o distracciones pueden afectar el desempeño.
           </Alert>
-          <Button asChild variant="secondary">
-            <Link href={`/evaluar/${run.assessments.subject_id}`}>Volver a las pruebas</Link>
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="secondary">
+              <Link href={`/evaluar/${run.assessments.subject_id}`}>Volver a las pruebas</Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href={`/historial/${run.assessments.subject_id}/${run.task_code}?run=${run.id}#run-${run.id}`}>
+                Ver historial de la prueba
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

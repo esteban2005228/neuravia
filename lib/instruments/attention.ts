@@ -114,6 +114,21 @@ export const attentionResponsesSchema = z.object({
 });
 export type AttentionResponses = z.infer<typeof attentionResponsesSchema>;
 
+/** A press counts for the first target whose window contains it; other presses are false alarms. */
+export function dividedHits(presses: readonly number[]) {
+  const hitTargets = new Set<number>();
+  let falseAlarms = 0;
+  for (const t of [...presses].sort((a, b) => a - b)) {
+    const target = DIVIDED_TARGETS.find((i) => {
+      const start = i * DIVIDED_WORD_MS;
+      return !hitTargets.has(i) && t >= start && t <= start + DIVIDED_WORD_MS + DIVIDED_GRACE_MS;
+    });
+    if (target === undefined) falseAlarms++;
+    else hitTargets.add(target);
+  }
+  return { hitTargets, falseAlarms };
+}
+
 export function scoreAttention(raw: unknown) {
   const r = attentionResponsesSchema.parse(raw);
 
@@ -124,17 +139,7 @@ export function scoreAttention(raw: unknown) {
 
   const sustained = r.sustained.reduce<number>((sum, a, i) => sum + (a === SUSTAINED_QUESTIONS[i].answer ? 2 : 0), 0);
 
-  // A press counts for the first target whose window contains it; other presses are false alarms.
-  const hitTargets = new Set<number>();
-  let falseAlarms = 0;
-  for (const t of [...r.divided.presses].sort((a, b) => a - b)) {
-    const target = DIVIDED_TARGETS.find((i) => {
-      const start = i * DIVIDED_WORD_MS;
-      return !hitTargets.has(i) && t >= start && t <= start + DIVIDED_WORD_MS + DIVIDED_GRACE_MS;
-    });
-    if (target === undefined) falseAlarms++;
-    else hitTargets.add(target);
-  }
+  const { hitTargets, falseAlarms } = dividedHits(r.divided.presses);
   const divided = Math.max(0, hitTargets.size * 2 - falseAlarms);
 
   const alternating = r.alternating.reduce<number>(
