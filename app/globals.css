@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+/* Neuravia identity: cyan, blue, lavender, sand. Text #2A3A4F. No reds:
+   alerts use desaturated coral or amber. */
+:root {
+  --background: #f7f9fc;
+  --foreground: #2a3a4f;
+  --card: #ffffff;
+  --card-foreground: #2a3a4f;
+  --muted: #eef2f8;
+  --muted-foreground: #5b6b80;
+  --border: #dde4ee;
+  --input: #cfd8e5;
+  --ring: #6fb4d8;
+
+  --primary: #3f86b5;
+  --primary-foreground: #ffffff;
+  --secondary: #e7ecfa;
+  --secondary-foreground: #2a3a4f;
+  --accent: #86e3e8;
+  --accent-foreground: #1d3a4a;
+
+  --cyan: #86e3e8;
+  --blue: #7bb7df;
+  --lavender: #aab4e8;
+  --sand: #d8c3a5;
+  --coral: #e3a48f;
+  --coral-foreground: #6b3a2c;
+  --amber: #e6c27a;
+  --amber-foreground: #5e4716;
+
+  --radius: 0.875rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-cyan: var(--cyan);
+  --color-blue: var(--blue);
+  --color-lavender: var(--lavender);
+  --color-sand: var(--sand);
+  --color-coral: var(--coral);
+  --color-coral-foreground: var(--coral-foreground);
+  --color-amber: var(--amber);
+  --color-amber-foreground: var(--amber-foreground);
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  --font-sans: var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Soft aurora background used on public and onboarding screens. */
+.aurora {
+  background:
+    radial-gradient(60% 50% at 10% 10%, color-mix(in srgb, var(--cyan) 45%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 90% 15%, color-mix(in srgb, var(--lavender) 50%, transparent), transparent 70%),
+    radial-gradient(55% 50% at 70% 95%, color-mix(in srgb, var(--sand) 45%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 15% 90%, color-mix(in srgb, var(--blue) 35%, transparent), transparent 70%),
+    var(--background);
+}
+
+/* jsPsych stage: large, calm and centered. */
+.task-stage {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 1.25rem;
+}
+.task-stage .jspsych-content {
+  max-width: 42rem;
+}
+.task-stage .jspsych-btn {
+  font: inherit;
+  min-width: 7rem;
+  min-height: 3.5rem;
+  margin: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--input);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+}
+.task-stage .jspsych-btn:hover {
+  background: var(--secondary);
+}
+.task-stage input[type="text"] {
+  font: inherit;
+  font-size: 1.75rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  width: 16rem;
+}
+.task-stage .flanker-arrows {
+  font-size: 3.5rem;
+  letter-spacing: 0.15em;
+  font-family: ui-monospace, monospace;
+}
+.task-stage .digit {
+  font-size: 5rem;
+  font-family: var(--font-display);
+}
+.task-stage .fixation {
+  font-size: 3rem;
+}
+
+/* Stronger aurora so the frosted glass card has color to blur. */
+.aurora-vivid {
+  background:
+    radial-gradient(45% 40% at 12% 18%, color-mix(in srgb, var(--cyan) 85%, transparent), transparent 70%),
+    radial-gradient(40% 45% at 88% 12%, color-mix(in srgb, var(--lavender) 90%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 75% 92%, color-mix(in srgb, var(--sand) 80%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 10% 88%, color-mix(in srgb, var(--blue) 80%, transparent), transparent 70%),
+    radial-gradient(35% 30% at 50% 50%, color-mix(in srgb, var(--lavender) 45%, transparent), transparent 75%),
+    var(--background);
+}
+
+/* Frosted glass card. Nested surfaces (inputs, option cards, checkboxes)
+   inherit translucent tokens so the whole card reads as glass. */
+.glass {
+  --card: rgb(255 255 255 / 0.35);
+  --border: rgb(255 255 255 / 0.7);
+  --input: rgb(255 255 255 / 0.85);
+  background: rgb(255 255 255 / 0.2);
+  border: 1px solid rgb(255 255 255 / 0.65);
+  box-shadow:
+    0 20px 50px -20px rgb(42 58 79 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.7);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}
